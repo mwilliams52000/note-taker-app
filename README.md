@@ -31,6 +31,10 @@ Clone this repo by clicking on the Source Control button on the left toolbar, th
 
 Before you go any further, make sure you have Python and that the expected version is available from your command line. You can check this by clicking the Windows key + R and typing 'cmd'. Click 'Ok' and launch the command line. Type 'py --version' within the command line. You should see something like this if Python is properly installed: 'Python 3.11.4'. If you do, then type in 'py -m pip --version' to ensure that you have pip available. As long as pip is available, you can proceed to installing the libraries.
 
-To install pyaudio, type in 'py -m pip install pyaudio' into the command line.
+To install pyaudio, type this into the command line:
 
-To install pyspellchecker, type in 'py -m pip install pyspellchecker' into the command line.
+    py -m pip install pyaudio
+
+To install pyspellchecker, type this into the command line:
+
+    py -m pip install pyspellchecker
