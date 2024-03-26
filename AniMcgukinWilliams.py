@@ -134,6 +134,43 @@ class TypedNotePage(tk.Frame):
         text_area = tk.Text(self)
         text_area.pack(expand=True, fill='both')
 
+
+        # Create a menu bar
+        menu_bar = tk.Menu(self)
+
+
+        # Create file menu
+        file_menu = tk.Menu(menu_bar, tearoff=0)
+        file_menu.add_command(label="Open")
+        file_menu.add_command(labe="Save")
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command_self.quit)
+        file_menu.add_cascade(label="File", menu=file_menu)
+
+        # Create Edit menu
+        edit_menu = tk.Menu(menu_bar, tearoff=0)
+        edit_menu.add_command(label="Undo")
+        edit_menu.add_command(label="Redo")
+        edit_menu.add_separator()
+        edit_menu.add_command(label="Cut")
+        edit_menu.add_command(label="Copy")
+        edit_menu.add_command(label="Paste")
+        menu_bar.add_cascade(label="Edit", menu=color_menu)
+
+
+        # Create color menu
+        color_menu = tk.Menu(menu_bar, tearoff=0)
+        color_menu.add_command(label="Select Color")
+        menu_bar.add_cascade(label="Color", menu=color_menu)
+
+        # Create transcribr speech menu
+        transcribe_menu = tk.Menu(menu_bar, tearoff=0)
+        transcribe_menu.add_command(label="Start Transcription")
+        menu_bar.add_cascade(label="Transcribe Speech", menu=transcribe_menu)
+
+        # Configure the typed note page to use the menu bar
+        controller.config(menu=menu_bar)
+
 # Driver Code
 app = noteTaker()
 app.mainloop()
