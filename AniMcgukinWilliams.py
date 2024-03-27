@@ -37,7 +37,7 @@ class noteTaker(tk.Tk):
         self.frames = {}  
 
         # Iterate through a tuple consiting of the classes of the pages
-        for F in (LandingPage, TypedNotePage):
+        for F in (LandingPage, TypedNotePage, DrawnNotePage):
             frame = F(container, self)
             # Store the frame in the frames array
             self.frames[F] = frame
@@ -87,7 +87,7 @@ class LandingPage(tk.Frame):
         # Button texts and commands placed in a list
         buttons = [
             ("New Typed Note", lambda: self.new_typed_note_navigate(controller)),
-            ("New Drawn Note", None),
+            ("New Drawn Note", lambda: self.new_drawn_note_navigate(controller)),
             ("Load Note", None)
         ]
 
@@ -114,7 +114,7 @@ class LandingPage(tk.Frame):
         self.grid_columnconfigure(1, weight=1)
         self.grid_columnconfigure(2, weight=1)
     
-    # New Note Navigate Function
+    # New Typed Note Navigate Function
     # Description: Changes the window title and switches to the TypedNotePage frame.
     # Preconditions: The controller must be passed as a parameter.
     # Postconditions: The TypedNotePage frame is displayed.
@@ -122,6 +122,17 @@ class LandingPage(tk.Frame):
         controller.title("untitled - Note-Taker App")
         controller.show_frame(TypedNotePage)
         menu_bar = self.buildTypedNoteMenu()
+        # Configure the typed note page to use the menu bar
+        controller.config(menu=menu_bar)
+    
+    # New Drawn Note Navigate Function
+    # Description:
+    # Preconditions:
+    # Postconditions
+    def new_drawn_note_navigate(self, controller):
+        controller.title("untitled - Note-Taker App")
+        controller.show_frame(DrawnNotePage)
+        menu_bar = self.buildDrawnNoteMenu()
         # Configure the typed note page to use the menu bar
         controller.config(menu=menu_bar)
     
@@ -162,6 +173,29 @@ class LandingPage(tk.Frame):
         menu_bar.add_cascade(label="Transcribe Speech", menu=transcribe_menu)
 
         return menu_bar
+    
+    # Build Drawn Note Menu Function
+    # Description:
+    # Preconditions:
+    # Postconditions:
+    def buildDrawnNoteMenu(self):
+        # Create a menu bar
+        menu_bar = tk.Menu(self)
+
+        # Create file menu
+        file_menu = tk.Menu(menu_bar, tearoff=0)
+        file_menu.add_command(label="Open")
+        file_menu.add_command(label="Save")
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit")
+        menu_bar.add_cascade(label="File", menu=file_menu)
+
+        # Create color menu
+        color_menu = tk.Menu(menu_bar, tearoff=0)
+        color_menu.add_command(label="Select Color")
+        menu_bar.add_cascade(label="Color", menu=color_menu)
+
+        return menu_bar
 
 class TypedNotePage(tk.Frame):
     # Initialization Function
@@ -175,29 +209,40 @@ class TypedNotePage(tk.Frame):
         text_area = tk.Text(self)
         text_area.pack(expand=True, fill='both')
 
-class DrawnNotePage(tk.Canvas):
+class DrawnNotePage(tk.Frame):
     # Initialization Function
-    # Description: 
-    # Preconditions: 
-    # Posconditions: 
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, **kwargs)
-        self.bind("<Button-1>", self.save_posn)
-        self.bind("B1-Motion>", self.add_line)
+    # Description: Initializes the DrawnNotePage class
+    # Preconditions: None
+    # Postconditions: None
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent)
+        self.controller = controller
+        
+        # Create canvas area to draw notes
+        self.canvas = tk.Canvas(self)
+        self.canvas.pack(expand=True, fill='both')
 
+        # Bind mouse dragging event to canvas
+        self.canvas.bind("<Button-1>", self.save_posn)
+        self.canvas.bind("<B1-Motion>", self.add_line)
+
+        self.lastx, self.lasty = None, None
+
+    # Save Position Function
+    # Description:
+    # Preconditions:
+    # Postconditions:
     def save_posn(self, event):
         self.lastx, self.lasty = event.x, event.y
 
+    # Add Line Function
+    # Description:
+    # Preconditions:
+    # Postconditions:
     def add_line(self, event):
-        self.create_line((self.lastx, self.lasty, event.x, event.y))
+        if self.lastx and self.lasty:
+            self.canvas.create_line(self.lastx, self.lasty, event.x, event.y)
         self.save_posn(event)
-
-root = tk.Tk()
-root.columnconfigure(0, weight=1)
-root.rowconfigure(0, weight=1)
-
-sketch = DrawnNotePage(root)
-sketch.grid(column=0, row=0, sticky=("nsew"))
 
 
 # Driver Code
