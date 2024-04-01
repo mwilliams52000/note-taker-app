@@ -61,6 +61,7 @@ class LandingPage(tk.Frame):
     # Postconditions: The LandingPage frame is displayed.
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
+        self.controller = controller
         self.grid(sticky=tk.N+tk.S+tk.E+tk.W)
 
         # Set size of window
@@ -157,6 +158,10 @@ class LandingPage(tk.Frame):
         edit_menu.add_command(label="Undo")
         edit_menu.add_command(label="Redo")
         edit_menu.add_separator()
+        edit_menu.add_command(label="Underline Text", command=self.controller.frames[TypedNotePage].underline_text)
+        edit_menu.add_command(label="Remove Underline", command=self.controller.frames[TypedNotePage].remove_underline_text)
+        edit_menu.add_command(label="Add Bullet Point", command=self.controller.frames[TypedNotePage].add_bullet_point)
+        edit_menu.add_separator()
         edit_menu.add_command(label="Cut")
         edit_menu.add_command(label="Copy")
         edit_menu.add_command(label="Paste")
@@ -164,7 +169,13 @@ class LandingPage(tk.Frame):
 
         # Create color menu
         color_menu = tk.Menu(menu_bar, tearoff=0)
-        color_menu.add_command(label="Select Color")
+        color_menu.add_command(label="Default")
+        color_menu.add_command(label="Red")
+        color_menu.add_command(label="Blue")
+        color_menu.add_command(label="Green")
+        color_menu.add_command(label="Yellow")
+        color_menu.add_command(label="Purple")
+        color_menu.add_command(label="White")
         menu_bar.add_cascade(label="Color", menu=color_menu)
 
         # Create transcribe speech menu
@@ -192,7 +203,14 @@ class LandingPage(tk.Frame):
 
         # Create color menu
         color_menu = tk.Menu(menu_bar, tearoff=0)
-        color_menu.add_command(label="Select Color")
+        color_menu.add_command(label="Default")
+        color_menu.add_command(label="Red")
+        color_menu.add_command(label="Blue")
+        color_menu.add_command(label="Green")
+        color_menu.add_command(label="Yellow")
+        color_menu.add_command(label="Purple")
+        color_menu.add_command(label="White")
+
         menu_bar.add_cascade(label="Color", menu=color_menu)
 
         return menu_bar
@@ -206,9 +224,97 @@ class TypedNotePage(tk.Frame):
         tk.Frame.__init__(self, parent)
 
         # Create text area to type notes
-        text_area = tk.Text(self)
-        text_area.pack(expand=True, fill='both')
+        self.text_area = tk.Text(self)
+        self.text_area.pack(expand=True, fill='both')
 
+        # Bind keyboard actions to buttons
+        # Sources: https://tkdocs.com/tutorial/text.html
+        # https://www.geeksforgeeks.org/python-binding-function-in-tkinter/
+
+        # When the user releases the enter key or return key, check if the previous line is bulleted
+        # If it is, bullet this current line as well
+        self.text_area.bind("<KeyRelease-Return>", lambda event: self.is_prev_line_bulleted())
+
+        # When the user types into the keybaord, check if the previous character is underlined
+        # If it is, underline this current character as well
+        self.text_area.bind("<Key>", lambda event: self.is_prev_char_underlined())
+    
+    # Underline Text Function
+    # Description: Underlines the selected text in the text area.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The selected text is underlined.
+    def underline_text(self):
+        # Get the current selection
+        current_selection = self.text_area.tag_ranges(tk.SEL)
+        # If there is a selection, underline the text
+        if current_selection:
+            # Give this selection the "underline" tag so it is recognized as underlined
+            # This tag will prove useful for saving and reloading notes
+            # and is used to determine if the text following should be underlined
+            # Source: https://tkdocs.com/tutorial/text.html#tags
+            self.text_area.tag_add("underline", current_selection[0], current_selection[1])
+            self.text_area.tag_configure("underline", underline=True)
+    
+    # Remove Underline Text Function
+    # Description: Removes the underline from the selected text in the text area.
+    # Preconditions:
+    # Postconditions: The underline is removed from the selected text.
+    def remove_underline_text(self):
+        # Get the current selection
+        current_selection = self.text_area.tag_ranges(tk.SEL)
+        # If there is a selection, underline the text
+        if current_selection:
+            self.text_area.tag_remove("underline", current_selection[0], current_selection[1])
+            self.text_area.tag_configure("", underline=False)
+    
+    # Add Bullet Point Function
+    # Description: Adds a bullet point at the start of the current line.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: A bullet point is added at the start of the current line.
+    def add_bullet_point(self):
+        # Get the current index of the typing cursor within the text_area
+        current_index = self.text_area.index(tk.INSERT)
+        # Get the start index of the current line of the text_area
+        line_start_index = "{}.0".format(current_index.split('.')[0])
+        # Insert bullet point at the start of the line
+        # \u2022 is the unicode escape for a bullet point character
+        # Source: https://www.ascii-code.com/character/%E2%80%A2
+        self.text_area.insert(line_start_index, u'\u2022' + ' ')
+    
+    # Is Previous Line Bulleted Function
+    # Description: Checks if the previous line is bulleted. If it is, bullet the current line.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The current line is bulleted if the previous line is bulleted.
+    def is_prev_line_bulleted(self):
+        # Get the current index of the typing cursor
+        current_index = self.text_area.index(tk.INSERT)
+        # Get the start index of the current line
+        line_start_index = "{}.0".format(current_index.split('.')[0])
+        # If the line start index is not 1.0, then this current line is not the first line
+        if not(line_start_index == "1.0"):
+            # Get the previous line index
+            prev_line_index = "{}.0".format(int(current_index.split('.')[0]) - 1)
+            # Check if the first character of the previous line is a bullet point
+            if self.text_area.get(prev_line_index, f"{prev_line_index} + 1 char") == u'\u2022':
+                # If it is, bullet this current line as well
+                self.add_bullet_point()
+    
+    # Is Previous Character Underlined
+    # Description: Checks if the previous character is underlined. If it is, underline the current character.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The current character is underlined if the previous character is underlined.
+    def is_prev_char_underlined(self):
+        # Get the current index of the typing cursor
+        current_index = self.text_area.index(tk.INSERT)
+        # Get the index of the previous character
+        prev_char_index = "{}.{}".format(current_index.split('.')[0], int(current_index.split('.')[1]) - 1)
+
+        # Check if the previous character has the "underline" tag
+        if "underline" in self.text_area.tag_names(prev_char_index):
+            # If it is, underline the current character as well
+            self.text_area.tag_add("underline", current_index)
+            self.text_area.tag_configure("underline", underline=True)
+        
 class DrawnNotePage(tk.Frame):
     # Initialization Function
     # Description: Initializes the DrawnNotePage class
