@@ -10,6 +10,9 @@ from spellchecker import SpellChecker
 import pickle
 import pyaudio
 import wave
+from tkinter import ttk, Listbox, Scrollbar, Menu
+import speech_recognition as sr
+from tkinter import ttk, Menu
 
 # Font for landing page title
 LARGEFONT =("Verdana", 25)
@@ -35,6 +38,7 @@ class noteTaker(tk.Tk):
   
         # Initialize frames to an empty array
         self.frames = {}  
+
 
         # Iterate through a tuple consiting of the classes of the pages
         for F in (LandingPage, TypedNotePage, DrawnNotePage):
@@ -63,6 +67,9 @@ class LandingPage(tk.Frame):
         tk.Frame.__init__(self, parent)
         self.controller = controller
         self.grid(sticky=tk.N+tk.S+tk.E+tk.W)
+        menu_bar = self.buildMenu()
+        controller.config(menu=menu_bar)
+        
 
         # Set size of window
         # Source: https://tkdocs.com/shipman/toplevel.html
@@ -215,6 +222,50 @@ class LandingPage(tk.Frame):
 
         return menu_bar
 
+    def buildMenu(self):
+        menu_bar = tk.Menu(self)
+
+        file_menu = tk.Menu(menu_bar, tearoff=0)
+        file_menu.add_command(label="Open")
+        file_menu.add_command(label="Save")
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit")
+        menu_bar.add_cascade(label="File", menu=File_menu)
+
+        transcribe_menu = tk.Menu(menu_bar, tearoff=0)
+        transcribe_menu.add_command(label="Start transciption", command=self.transcribe_speech)
+        menu_bar.add_cascade(label="Transcribe speech", menu=transcribe_menu)
+
+        return menu_bar
+        
+    def transcribe_speech(self):
+        # Create a recognizer object
+        recognizer = sr.Recongnizer()
+
+        # Use the defualt microphone as the audio source
+        with sr.Microphone()as source:
+            recognizer.adjust_for_ambient_noise(source)
+            print("Listening ... ")
+
+
+            try:
+
+                audio = recognizer.listen(source)
+
+                text = recognizer.recognize_google(audio)
+                print("Transcription :", text)
+
+                tk.messagebox.showinfo("Transcription", text)
+
+            except sr.UnknownValueError:
+                print("Could not understand audio")
+
+                tk.messagebox.showerror("Error", "Could not understand audio")
+
+            except st.RequestError as e:
+                print("could not request results; {0}".format(e))
+
+                tk.messagebox.showerror("Error", "Could not request results; {0}".format(e))
 class TypedNotePage(tk.Frame):
     # Initialization Function
     # Description: Initializes the TypedNotePage class
