@@ -210,13 +210,13 @@ class LandingPage(tk.Frame):
 
         # Create color menu
         color_menu = tk.Menu(menu_bar, tearoff=0)
-        color_menu.add_command(label="Default")
-        color_menu.add_command(label="Red")
-        color_menu.add_command(label="Blue")
-        color_menu.add_command(label="Green")
-        color_menu.add_command(label="Yellow")
-        color_menu.add_command(label="Purple")
-        color_menu.add_command(label="White")
+        color_menu.add_command(label="Default", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("black"))
+        color_menu.add_command(label="Red", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("red"))
+        color_menu.add_command(label="Blue", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("blue"))
+        color_menu.add_command(label="Green", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("green"))
+        color_menu.add_command(label="Yellow", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("yellow"))
+        color_menu.add_command(label="Purple", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("purple"))
+        color_menu.add_command(label="White", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("white"))
 
         menu_bar.add_cascade(label="Color", menu=color_menu)
 
@@ -230,7 +230,7 @@ class LandingPage(tk.Frame):
         file_menu.add_command(label="Save")
         file_menu.add_separator()
         file_menu.add_command(label="Exit")
-        menu_bar.add_cascade(label="File", menu=File_menu)
+        menu_bar.add_cascade(label="File", menu=file_menu)
 
         transcribe_menu = tk.Menu(menu_bar, tearoff=0)
         transcribe_menu.add_command(label="Start transciption", command=self.transcribe_speech)
@@ -240,7 +240,7 @@ class LandingPage(tk.Frame):
         
     def transcribe_speech(self):
         # Create a recognizer object
-        recognizer = sr.Recongnizer()
+        recognizer = sr.Recognizer()
 
         # Use the defualt microphone as the audio source
         with sr.Microphone()as source:
@@ -262,7 +262,7 @@ class LandingPage(tk.Frame):
 
                 tk.messagebox.showerror("Error", "Could not understand audio")
 
-            except st.RequestError as e:
+            except sr.RequestError as e:
                 print("could not request results; {0}".format(e))
 
                 tk.messagebox.showerror("Error", "Could not request results; {0}".format(e))
@@ -384,6 +384,7 @@ class DrawnNotePage(tk.Frame):
         self.canvas.bind("<B1-Motion>", self.add_line)
 
         self.lastx, self.lasty = None, None
+        self.color = "black"
 
     # Save Position Function
     # Description:
@@ -398,9 +399,11 @@ class DrawnNotePage(tk.Frame):
     # Postconditions:
     def add_line(self, event):
         if self.lastx and self.lasty:
-            self.canvas.create_line(self.lastx, self.lasty, event.x, event.y)
+            self.canvas.create_line((self.lastx, self.lasty, event.x, event.y), fill=self.color)
         self.save_posn(event)
 
+    def set_line_color(self, line_color):
+        self.color = line_color
 
 # Driver Code
 app = noteTaker()
