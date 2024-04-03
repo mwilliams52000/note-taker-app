@@ -1,4 +1,4 @@
-# CMSC-3380-001 Note-Taker Project
+ # CMSC-3380-001 Note-Taker Project
 # Ibrahim Al Ani, Joshua McGukin, Matthew Williams
 # ala17357@pennwest.edu, mcg1027@pennwest.edu, wil1041@pennwest.edu
 
@@ -6,7 +6,9 @@
 import tkinter as tk
 from tkinter import ttk, Listbox, Scrollbar
 from tkinter import filedialog
+from tkinter import messagebox
 from spellchecker import SpellChecker
+import threading
 import pickle
 import pyaudio
 import wave
@@ -67,9 +69,6 @@ class LandingPage(tk.Frame):
         tk.Frame.__init__(self, parent)
         self.controller = controller
         self.grid(sticky=tk.N+tk.S+tk.E+tk.W)
-        menu_bar = self.buildMenu()
-        controller.config(menu=menu_bar)
-        
 
         # Set size of window
         # Source: https://tkdocs.com/shipman/toplevel.html
@@ -157,7 +156,9 @@ class LandingPage(tk.Frame):
         file_menu.add_command(label="Open")
         file_menu.add_command(label="Save")
         file_menu.add_separator()
-        file_menu.add_command(label="Exit")
+    
+        # Source: https://www.geeksforgeeks.org/how-to-close-a-window-in-tkinter/
+        file_menu.add_command(label="Exit", command = lambda: self.controller.destroy())
         menu_bar.add_cascade(label="File", menu=file_menu)
 
         # Create Edit menu
@@ -187,7 +188,7 @@ class LandingPage(tk.Frame):
 
         # Create transcribe speech menu
         transcribe_menu = tk.Menu(menu_bar, tearoff=0)
-        transcribe_menu.add_command(label="Start Transcription")
+        transcribe_menu.add_command(label="Start Transcription", command=self.controller.frames[TypedNotePage].create_audio_window)
         menu_bar.add_cascade(label="Transcribe Speech", menu=transcribe_menu)
 
         return menu_bar
@@ -205,67 +206,25 @@ class LandingPage(tk.Frame):
         file_menu.add_command(label="Open")
         file_menu.add_command(label="Save")
         file_menu.add_separator()
-        file_menu.add_command(label="Exit")
+
+        # Source: https://www.geeksforgeeks.org/how-to-close-a-window-in-tkinter/
+        file_menu.add_command(label="Exit", command = lambda: self.controller.destroy())
         menu_bar.add_cascade(label="File", menu=file_menu)
 
         # Create color menu
         color_menu = tk.Menu(menu_bar, tearoff=0)
-        color_menu.add_command(label="Default")
-        color_menu.add_command(label="Red")
-        color_menu.add_command(label="Blue")
-        color_menu.add_command(label="Green")
-        color_menu.add_command(label="Yellow")
-        color_menu.add_command(label="Purple")
-        color_menu.add_command(label="White")
+        color_menu.add_command(label="Default", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("black"))
+        color_menu.add_command(label="Red", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("red"))
+        color_menu.add_command(label="Blue", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("blue"))
+        color_menu.add_command(label="Green", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("green"))
+        color_menu.add_command(label="Yellow", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("yellow"))
+        color_menu.add_command(label="Purple", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("purple"))
+        color_menu.add_command(label="White", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("white"))
 
         menu_bar.add_cascade(label="Color", menu=color_menu)
 
         return menu_bar
-
-    def buildMenu(self):
-        menu_bar = tk.Menu(self)
-
-        file_menu = tk.Menu(menu_bar, tearoff=0)
-        file_menu.add_command(label="Open")
-        file_menu.add_command(label="Save")
-        file_menu.add_separator()
-        file_menu.add_command(label="Exit")
-        menu_bar.add_cascade(label="File", menu=File_menu)
-
-        transcribe_menu = tk.Menu(menu_bar, tearoff=0)
-        transcribe_menu.add_command(label="Start transciption", command=self.transcribe_speech)
-        menu_bar.add_cascade(label="Transcribe speech", menu=transcribe_menu)
-
-        return menu_bar
-        
-    def transcribe_speech(self):
-        # Create a recognizer object
-        recognizer = sr.Recongnizer()
-
-        # Use the defualt microphone as the audio source
-        with sr.Microphone()as source:
-            recognizer.adjust_for_ambient_noise(source)
-            print("Listening ... ")
-
-
-            try:
-
-                audio = recognizer.listen(source)
-
-                text = recognizer.recognize_google(audio)
-                print("Transcription :", text)
-
-                tk.messagebox.showinfo("Transcription", text)
-
-            except sr.UnknownValueError:
-                print("Could not understand audio")
-
-                tk.messagebox.showerror("Error", "Could not understand audio")
-
-            except st.RequestError as e:
-                print("could not request results; {0}".format(e))
-
-                tk.messagebox.showerror("Error", "Could not request results; {0}".format(e))
+    
 class TypedNotePage(tk.Frame):
     # Initialization Function
     # Description: Initializes the TypedNotePage class
@@ -365,7 +324,128 @@ class TypedNotePage(tk.Frame):
             # If it is, underline the current character as well
             self.text_area.tag_add("underline", current_index)
             self.text_area.tag_configure("underline", underline=True)
+    
+    # Create Audio Window Function
+    # Description: Creates a new window for audio recording.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: A new window for audio recording is built and launched.
+    def create_audio_window(self):
+        # Create a new window for audio recording
+        self.audio_window = tk.Toplevel(self)
+        self.audio_window.title("Audio Recorder")
+        self.audio_window.geometry("300x200")
+
+        # Bind the close event to the toggle_recording function
+        # Source: https://tkdocs.com/tutorial/windows.html
+        # Intercepting the close button section
+        self.audio_window.protocol("WM_DELETE_WINDOW", self.toggle_recording_exit)
+
+        # Create a label to provide user directions
+        label = tk.Label(self.audio_window, text="Select the microphone icon to start recording audio")
+        label.pack()
+
+        # Create a record button that will start recording audio
+        self.record_button = tk.Button(self.audio_window, text="🎤", font=("Arial", 25, "bold"), command=self.toggle_recording, fg='black')
+        self.record_button.pack()
+        self.recording = False
+
+        # Add blank message label field
+        self.message_label = tk.Label(self.audio_window, text="")
+        self.message_label.pack()
+
+    # Toggle Recording Function
+    # This function was partially adapted from this source: https://www.youtube.com/watch?v=u_xNvC9PpHA& 
+    # Description: Toggles the recording of audio.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The audio recording is toggled to be True or False.
+    def toggle_recording(self):
+        # If recording is already in process, stop recording by setting recording to False
+        # This will interrupt the thread that is recording audio
+        if self.recording:
+            self.message_label.config(text="")
+            self.recording = False
+            self.record_button.config(fg='black')
+        # If recording is not in process, start recording by setting recording to True
+        # This will also start a new thread to record audio
+        else:
+            self.message_label.config(text="Recording in process...")
+            self.recording = True
+            # This source was used to learn how to start a new thread to record audio
+            # https://www.youtube.com/watch?v=u_xNvC9PpHA
+            threading.Thread(target=self.take_audio).start()
+            self.record_button.config(fg='red')
+    
+    # Toggle Recording Exit Function
+    # Description: This function is binded to the record audio window exit. It stops the recording of audio if it is in process.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The audio recording is set to False if it is True.
+    def toggle_recording_exit(self):
+        if self.recording:
+            self.recording = False
+        # Source: https://www.geeksforgeeks.org/how-to-close-a-window-in-tkinter/
+        self.audio_window.destroy()
+
+    # Take Audio Function
+    # This function was partially adapted from this source: https://www.youtube.com/watch?v=u_xNvC9PpHA& 
+    # Description:
+    # Preconditions:
+    # Postconditions:
+    def take_audio(self):
+        # Takes audio while the thread is running
+        audio = pyaudio.PyAudio()
+        # Try block catches errors, such as a lack of a microphone connected or an unexpected issue while recording
+        try:
+            stream = audio.open(format=pyaudio.paInt16, channels=1, rate=44100,
+                                input=True, frames_per_buffer=1024)
+        except OSError as e:
+            self.recording = False
+            audio.terminate()
+            self.record_button.config(fg='black')
+            self.message_label.config(text="Error: No microphone detected")
+            return
         
+        # For tracking the time of recording
+        frames = []
+
+        # While recording (the thread is running)
+        while self.recording:
+            data = stream.read(1024)
+            frames.append(data)
+
+        # Arrives here when the thread is interrupted (the user selects the record button to stop)
+        # Stops audio stream and terminates
+        stream.stop_stream()
+        stream.close()
+        audio.terminate()
+
+        # Creates audio file
+        input_text = "audio.wav"
+        sound_file = wave.open(input_text, "wb")
+        sound_file.setnchannels(1)
+        sound_file.setsampwidth(audio.get_sample_size(pyaudio.paInt16))
+        sound_file.setframerate(44100)
+        sound_file.writeframes(b"".join(frames))
+        sound_file.close()
+    
+    # Transcribe Speech Function
+    # Description:
+    # Preconditions:
+    # Postconditions:
+    def transcribe_speech(self):
+        # obtain audio from the microphone
+        r = sr.Recognizer()
+        with sr.Microphone() as source:
+            print("Say something!")
+            audio = r.listen(source)
+
+        # recognize speech using whisper
+        try:
+            print("Whisper thinks you said " + r.recognize_whisper(audio, language="english"))
+        except sr.UnknownValueError:
+            print("Whisper could not understand audio")
+        except sr.RequestError as e:
+            print(f"Could not request results from Whisper; {e}")
+
 class DrawnNotePage(tk.Frame):
     # Initialization Function
     # Description: Initializes the DrawnNotePage class
@@ -374,6 +454,9 @@ class DrawnNotePage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.controller = controller
+        
+        # Set default line color
+        self.color = "black"
         
         # Create canvas area to draw notes
         self.canvas = tk.Canvas(self)
@@ -398,10 +481,17 @@ class DrawnNotePage(tk.Frame):
     # Postconditions:
     def add_line(self, event):
         if self.lastx and self.lasty:
-            self.canvas.create_line(self.lastx, self.lasty, event.x, event.y)
+            self.canvas.create_line((self.lastx, self.lasty, event.x, event.y), fill=self.color)
         self.save_posn(event)
+    
+    # Set Line Color Function
+    # Description:
+    # Preconditions:
+    # Postconditions:
+    def set_line_color(self, line_color):
+        self.color = line_color
 
 
 # Driver Code
 app = noteTaker()
-app.mainloop()
+app.mainloop() 
