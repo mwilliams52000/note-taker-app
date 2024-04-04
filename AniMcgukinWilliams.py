@@ -232,6 +232,7 @@ class TypedNotePage(tk.Frame):
     # Postconditions: 
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
+        self.windowNum = 0
 
         # Create text area to type notes
         self.text_area = tk.Text(self)
@@ -330,28 +331,32 @@ class TypedNotePage(tk.Frame):
     # Preconditions: Self must be passed as a parameter.
     # Postconditions: A new window for audio recording is built and launched.
     def create_audio_window(self):
-        # Create a new window for audio recording
-        self.audio_window = tk.Toplevel(self)
-        self.audio_window.title("Audio Recorder")
-        self.audio_window.geometry("300x200")
+        # Only create window if there are no other ones currently open
+        if (self.windowNum == 0):
+            # Create a new window for audio recording
+            self.audio_window = tk.Toplevel(self)
+            self.audio_window.title("Audio Recorder")
+            self.audio_window.geometry("300x200")
 
-        # Bind the close event to the toggle_recording function
-        # Source: https://tkdocs.com/tutorial/windows.html
-        # Intercepting the close button section
-        self.audio_window.protocol("WM_DELETE_WINDOW", self.toggle_recording_exit)
+            # Bind the close event to the toggle_recording function
+            # Source: https://tkdocs.com/tutorial/windows.html
+            # Intercepting the close button section
+            self.audio_window.protocol("WM_DELETE_WINDOW", self.toggle_recording_exit)
 
-        # Create a label to provide user directions
-        label = tk.Label(self.audio_window, text="Select the microphone icon to start recording audio")
-        label.pack()
+            # Create a label to provide user directions
+            label = tk.Label(self.audio_window, text="Select the microphone icon to start recording audio")
+            label.pack()
 
-        # Create a record button that will start recording audio
-        self.record_button = tk.Button(self.audio_window, text="🎤", font=("Arial", 25, "bold"), command=self.toggle_recording, fg='black')
-        self.record_button.pack()
-        self.recording = False
+            # Create a record button that will start recording audio
+            self.record_button = tk.Button(self.audio_window, text="🎤", font=("Arial", 25, "bold"), command=self.toggle_recording, fg='black')
+            self.record_button.pack()
+            self.recording = False
 
-        # Add blank message label field
-        self.message_label = tk.Label(self.audio_window, text="")
-        self.message_label.pack()
+            # Add blank message label field
+            self.message_label = tk.Label(self.audio_window, text="")
+            self.message_label.pack()
+            # Increment count of windows
+            self.windowNum = self.windowNum + 1
 
     # Toggle Recording Function
     # This function was partially adapted from this source: https://www.youtube.com/watch?v=u_xNvC9PpHA& 
@@ -382,6 +387,8 @@ class TypedNotePage(tk.Frame):
     def toggle_recording_exit(self):
         if self.recording:
             self.recording = False
+        # Decrement count of recording windows
+        self.windowNum = self.windowNum - 1
         # Source: https://www.geeksforgeeks.org/how-to-close-a-window-in-tkinter/
         self.audio_window.destroy()
 
