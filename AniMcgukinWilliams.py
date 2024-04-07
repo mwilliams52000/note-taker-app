@@ -1,4 +1,4 @@
- # CMSC-3380-001 Note-Taker Project
+# CMSC-3380-001 Note-Taker Project
 # Ibrahim Al Ani, Joshua McGukin, Matthew Williams
 # ala17357@pennwest.edu, mcg1027@pennwest.edu, wil1041@pennwest.edu
 
@@ -14,7 +14,7 @@ import pyaudio
 import wave
 from tkinter import ttk, Listbox, Scrollbar, Menu
 import speech_recognition as sr
-from tkinter import ttk, Menu
+from tkinter import ttk, Menu, font
 
 # Font for landing page title
 LARGEFONT =("Verdana", 25)
@@ -234,6 +234,10 @@ class TypedNotePage(tk.Frame):
         tk.Frame.__init__(self, parent)
         self.windowNum = 0
 
+        # Create word lists for TypedNotePage class
+        self.wordsList = []
+        self.mispelledWords = False
+
         # Create text area to type notes
         self.text_area = tk.Text(self)
         self.text_area.pack(expand=True, fill='both')
@@ -242,14 +246,48 @@ class TypedNotePage(tk.Frame):
         # Sources: https://tkdocs.com/tutorial/text.html
         # https://www.geeksforgeeks.org/python-binding-function-in-tkinter/
 
-        # When the user releases the enter key or return key, check if the previous line is bulleted
-        # If it is, bullet this current line as well
-        self.text_area.bind("<KeyRelease-Return>", lambda event: self.is_prev_line_bulleted())
-
         # When the user types into the keybaord, check if the previous character is underlined
         # If it is, underline this current character as well
         self.text_area.bind("<Key>", lambda event: self.is_prev_char_underlined())
+
+        # When the user types into the keyboard, manage the strings in the text area
+        self.text_area.bind("<KeyRelease>", lambda event: self.manage_text_area_strings())
+        self.text_area.bind("<Button-1>", lambda event: self.button1_control())
+
+        # When the user types enter, check if the previous line is bulleted and identify misspelled words
+        self.text_area.bind("<KeyRelease-Return>", lambda event: self.key_release_return_control())
+
+        # When the user taps left or right key, add visible spelling errors
+        self.text_area.bind("<Left>", lambda event: self.identify_misspelled_words())
+        self.text_area.bind("<Right>", lambda event: self.identify_misspelled_words())
+
+        # When the user types space or enter, add visible spelling errors
+        self.text_area.bind("<space>", lambda event: self.space_control())
+
+    # Key Release Return Control Function
+    # Description: Checks if the previous line is bulleted and identifies misspelled words by calling related functions.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The current line is bulleted if needed and misspelled words are identified.
+    def key_release_return_control(self):
+        self.is_prev_line_bulleted()
+        self.identify_misspelled_words()
     
+    # Button 1 Control Function
+    # Description: Manages the text area strings and identifies misspelled words by calling related functions.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The text area strings are managed and misspelled words are identified.
+    def button1_control(self):
+        self.manage_text_area_strings()
+        self.identify_misspelled_words()
+    
+    # Space Control Function
+    # Description: Identifies misspelled words and checks if the previous character is underlined by calling related functions.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: Misspelled words are identified and the current character is underlined if needed.
+    def space_control(self):
+        self.identify_misspelled_words()
+        self.is_prev_char_underlined()
+
     # Underline Text Function
     # Description: Underlines the selected text in the text area.
     # Preconditions: Self must be passed as a parameter.
@@ -326,6 +364,79 @@ class TypedNotePage(tk.Frame):
             self.text_area.tag_add("underline", current_index)
             self.text_area.tag_configure("underline", underline=True)
     
+    # Manage Text Area Strings
+    # Description: Adds and removes strings into the class's list of words.
+    # Precondition: Self must be passed as a parameter.
+    # Postconditions: The class's list of words is updated.
+    def manage_text_area_strings(self):
+        currentWordsList = []
+        # Get all characters in the text area as one long string
+        allText = self.text_area.get("1.0", "end-1c")
+        # Remove punctuation from the text
+        cleanedText = ''
+        for char in allText:
+            if char.isalnum() or char.isspace():
+                cleanedText += char
+        # Split the characters and put into a list
+        currentWordsList = cleanedText.split()
+        # Remove any words in the class's word list that are not in the current words list
+        for i in self.wordsList:
+            if (not(i in currentWordsList)):
+                self.wordsList.remove(i)
+        # Add any words that are in the current words list that are not in the class's word list
+        for i in currentWordsList:
+            if (not(i in self.wordsList)):
+                self.wordsList.append(i)
+        # Sort the class's word list
+        self.wordsList.sort()
+    
+    # Identify Misspelled Words Function
+    # Description: This function identifies unknown words in the class's word list and then adds a visible indictaor
+    # and tags to corresponding position in the text area.
+    # Preconditions: Class self must be passed as a parameter.
+    # Postconditions: Unknown words are identified and tagged in text area.
+    def identify_misspelled_words(self):
+        # Get SpellChecker object
+        spell = SpellChecker()
+        # From the class's word list, find words not in dictionary
+        unknownWordList = spell.unknown(self.wordsList)
+        # From the class's word list, find words in dictionary
+        knownWordList = spell.known(self.wordsList)
+        # Set tags for known words and remove unknown word tag if necessary
+        for word in knownWordList:
+            startIndex = "1.0"
+            loop = True
+            while loop:
+                # Sets start index to the start of the unknown word
+                startIndex = self.text_area.search(word, startIndex, stopindex="end")
+                if not startIndex:
+                    loop = False
+                else:
+                    endIndex = f"{startIndex}+{len(word)}c"
+                    self.text_area.tag_remove("unknown_word", startIndex, endIndex)
+                    # Make it bold and italicized
+                    self.text_area.tag_config("known_word", font=font.Font())
+                    # Sets start index to next word to look for repeat occurances
+                    startIndex = endIndex
+        self.mispelledWords = False
+        # Find unknown words in text area and add "unknown_word" tag
+        for word in unknownWordList:
+            startIndex = "1.0"
+            loop = True
+            while loop:
+                # Sets start index to the start of the unknown word
+                startIndex = self.text_area.search(word, startIndex, stopindex="end")
+                if not startIndex:
+                    loop = False
+                else:
+                    self.mispelledWords = True
+                    endIndex = f"{startIndex}+{len(word)}c"
+                    self.text_area.tag_add("unknown_word", startIndex, endIndex)
+                    # Make it bold and italicized
+                    self.text_area.tag_config("unknown_word", font=("Helvetica", 10, "bold italic"), foreground="red")
+                    # Sets start index to next word to look for repeat occurances
+                    startIndex = endIndex
+
     # Create Audio Window Function
     # Description: Creates a new window for audio recording.
     # Preconditions: Self must be passed as a parameter.
