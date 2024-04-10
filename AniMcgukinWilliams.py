@@ -6,13 +6,15 @@
 import tkinter as tk
 from tkinter import ttk, Listbox, Scrollbar
 from tkinter import filedialog
+from tkinter import messagebox
 from spellchecker import SpellChecker
+import threading
 import pickle
 import pyaudio
 import wave
 from tkinter import ttk, Listbox, Scrollbar, Menu
 import speech_recognition as sr
-from tkinter import ttk, Menu
+from tkinter import ttk, Menu, font
 
 # Font for landing page title
 LARGEFONT =("Verdana", 25)
@@ -67,9 +69,6 @@ class LandingPage(tk.Frame):
         tk.Frame.__init__(self, parent)
         self.controller = controller
         self.grid(sticky=tk.N+tk.S+tk.E+tk.W)
-        menu_bar = self.buildMenu()
-        controller.config(menu=menu_bar)
-        
 
         # Set size of window
         # Source: https://tkdocs.com/shipman/toplevel.html
@@ -157,7 +156,9 @@ class LandingPage(tk.Frame):
         file_menu.add_command(label="Open")
         file_menu.add_command(label="Save")
         file_menu.add_separator()
-        file_menu.add_command(label="Exit")
+    
+        # Source: https://www.geeksforgeeks.org/how-to-close-a-window-in-tkinter/
+        file_menu.add_command(label="Exit", command = lambda: self.controller.destroy())
         menu_bar.add_cascade(label="File", menu=file_menu)
 
         # Create Edit menu
@@ -187,7 +188,7 @@ class LandingPage(tk.Frame):
 
         # Create transcribe speech menu
         transcribe_menu = tk.Menu(menu_bar, tearoff=0)
-        transcribe_menu.add_command(label="Start Transcription")
+        transcribe_menu.add_command(label="Start Transcription", command=self.controller.frames[TypedNotePage].create_audio_window)
         menu_bar.add_cascade(label="Transcribe Speech", menu=transcribe_menu)
 
         return menu_bar
@@ -205,7 +206,9 @@ class LandingPage(tk.Frame):
         file_menu.add_command(label="Open")
         file_menu.add_command(label="Save")
         file_menu.add_separator()
-        file_menu.add_command(label="Exit")
+
+        # Source: https://www.geeksforgeeks.org/how-to-close-a-window-in-tkinter/
+        file_menu.add_command(label="Exit", command = lambda: self.controller.destroy())
         menu_bar.add_cascade(label="File", menu=file_menu)
 
         # Create color menu
@@ -221,51 +224,7 @@ class LandingPage(tk.Frame):
         menu_bar.add_cascade(label="Color", menu=color_menu)
 
         return menu_bar
-
-    def buildMenu(self):
-        menu_bar = tk.Menu(self)
-
-        file_menu = tk.Menu(menu_bar, tearoff=0)
-        file_menu.add_command(label="Open")
-        file_menu.add_command(label="Save")
-        file_menu.add_separator()
-        file_menu.add_command(label="Exit")
-        menu_bar.add_cascade(label="File", menu=file_menu)
-
-        transcribe_menu = tk.Menu(menu_bar, tearoff=0)
-        transcribe_menu.add_command(label="Start transciption", command=self.transcribe_speech)
-        menu_bar.add_cascade(label="Transcribe speech", menu=transcribe_menu)
-
-        return menu_bar
-        
-    def transcribe_speech(self):
-        # Create a recognizer object
-        recognizer = sr.Recognizer()
-
-        # Use the defualt microphone as the audio source
-        with sr.Microphone()as source:
-            recognizer.adjust_for_ambient_noise(source)
-            print("Listening ... ")
-
-
-            try:
-
-                audio = recognizer.listen(source)
-
-                text = recognizer.recognize_google(audio)
-                print("Transcription :", text)
-
-                tk.messagebox.showinfo("Transcription", text)
-
-            except sr.UnknownValueError:
-                print("Could not understand audio")
-
-                tk.messagebox.showerror("Error", "Could not understand audio")
-
-            except sr.RequestError as e:
-                print("could not request results; {0}".format(e))
-
-                tk.messagebox.showerror("Error", "Could not request results; {0}".format(e))
+    
 class TypedNotePage(tk.Frame):
     # Initialization Function
     # Description: Initializes the TypedNotePage class
@@ -273,6 +232,11 @@ class TypedNotePage(tk.Frame):
     # Postconditions: 
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
+        self.windowNum = 0
+
+        # Create word lists for TypedNotePage class
+        self.wordsList = []
+        self.mispelledWords = False
 
         # Create text area to type notes
         self.text_area = tk.Text(self)
@@ -282,14 +246,48 @@ class TypedNotePage(tk.Frame):
         # Sources: https://tkdocs.com/tutorial/text.html
         # https://www.geeksforgeeks.org/python-binding-function-in-tkinter/
 
-        # When the user releases the enter key or return key, check if the previous line is bulleted
-        # If it is, bullet this current line as well
-        self.text_area.bind("<KeyRelease-Return>", lambda event: self.is_prev_line_bulleted())
-
         # When the user types into the keybaord, check if the previous character is underlined
         # If it is, underline this current character as well
         self.text_area.bind("<Key>", lambda event: self.is_prev_char_underlined())
+
+        # When the user types into the keyboard, manage the strings in the text area
+        self.text_area.bind("<KeyRelease>", lambda event: self.manage_text_area_strings())
+        self.text_area.bind("<Button-1>", lambda event: self.button1_control())
+
+        # When the user types enter, check if the previous line is bulleted and identify misspelled words
+        self.text_area.bind("<KeyRelease-Return>", lambda event: self.key_release_return_control())
+
+        # When the user taps left or right key, add visible spelling errors
+        self.text_area.bind("<Left>", lambda event: self.identify_misspelled_words())
+        self.text_area.bind("<Right>", lambda event: self.identify_misspelled_words())
+
+        # When the user types space or enter, add visible spelling errors
+        self.text_area.bind("<space>", lambda event: self.space_control())
+
+    # Key Release Return Control Function
+    # Description: Checks if the previous line is bulleted and identifies misspelled words by calling related functions.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The current line is bulleted if needed and misspelled words are identified.
+    def key_release_return_control(self):
+        self.is_prev_line_bulleted()
+        self.identify_misspelled_words()
     
+    # Button 1 Control Function
+    # Description: Manages the text area strings and identifies misspelled words by calling related functions.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The text area strings are managed and misspelled words are identified.
+    def button1_control(self):
+        self.manage_text_area_strings()
+        self.identify_misspelled_words()
+    
+    # Space Control Function
+    # Description: Identifies misspelled words and checks if the previous character is underlined by calling related functions.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: Misspelled words are identified and the current character is underlined if needed.
+    def space_control(self):
+        self.identify_misspelled_words()
+        self.is_prev_char_underlined()
+
     # Underline Text Function
     # Description: Underlines the selected text in the text area.
     # Preconditions: Self must be passed as a parameter.
@@ -365,7 +363,214 @@ class TypedNotePage(tk.Frame):
             # If it is, underline the current character as well
             self.text_area.tag_add("underline", current_index)
             self.text_area.tag_configure("underline", underline=True)
+    
+    # Manage Text Area Strings
+    # Description: Adds and removes strings into the class's list of words.
+    # Precondition: Self must be passed as a parameter.
+    # Postconditions: The class's list of words is updated.
+    def manage_text_area_strings(self):
+        currentWordsList = []
+        # Get all characters in the text area as one long string
+        allText = self.text_area.get("1.0", "end-1c")
+        # Remove punctuation from the text
+        cleanedText = ''
+        for char in allText:
+            if char.isalnum() or char.isspace():
+                cleanedText += char
+        # Split the characters and put into a list
+        currentWordsList = cleanedText.split()
+        # Remove any words in the class's word list that are not in the current words list
+        for i in self.wordsList:
+            if (not(i in currentWordsList)):
+                self.wordsList.remove(i)
+        # Add any words that are in the current words list that are not in the class's word list
+        for i in currentWordsList:
+            if (not(i in self.wordsList)):
+                self.wordsList.append(i)
+        # Sort the class's word list
+        self.wordsList.sort()
+    
+    # Identify Misspelled Words Function
+    # Description: This function identifies unknown words in the class's word list and then adds a visible indictaor
+    # and tags to corresponding position in the text area.
+    # Preconditions: Class self must be passed as a parameter.
+    # Postconditions: Unknown words are identified and tagged in text area.
+    def identify_misspelled_words(self):
+        # Get SpellChecker object
+        spell = SpellChecker()
+        # From the class's word list, find words not in dictionary
+        unknownWordList = spell.unknown(self.wordsList)
+        # From the class's word list, find words in dictionary
+        knownWordList = spell.known(self.wordsList)
+        # Set tags for known words and remove unknown word tag if necessary
+        for word in knownWordList:
+            startIndex = "1.0"
+            loop = True
+            while loop:
+                # Sets start index to the start of the unknown word
+                startIndex = self.text_area.search(word, startIndex, stopindex="end")
+                if not startIndex:
+                    loop = False
+                else:
+                    endIndex = f"{startIndex}+{len(word)}c"
+                    self.text_area.tag_remove("unknown_word", startIndex, endIndex)
+                    # Make it bold and italicized
+                    self.text_area.tag_config("known_word", font=font.Font())
+                    # Sets start index to next word to look for repeat occurances
+                    startIndex = endIndex
+        self.mispelledWords = False
+        # Find unknown words in text area and add "unknown_word" tag
+        for word in unknownWordList:
+            startIndex = "1.0"
+            loop = True
+            while loop:
+                # Sets start index to the start of the unknown word
+                startIndex = self.text_area.search(word, startIndex, stopindex="end")
+                if not startIndex:
+                    loop = False
+                else:
+                    self.mispelledWords = True
+                    endIndex = f"{startIndex}+{len(word)}c"
+                    self.text_area.tag_add("unknown_word", startIndex, endIndex)
+                    # Make it bold and italicized
+                    self.text_area.tag_config("unknown_word", font=("Helvetica", 10, "bold italic"), foreground="red")
+                    # Sets start index to next word to look for repeat occurances
+                    startIndex = endIndex
+
+    # Create Audio Window Function
+    # Description: Creates a new window for audio recording.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: A new window for audio recording is built and launched.
+    def create_audio_window(self):
+        # Only create window if there are no other ones currently open
+        if (self.windowNum == 0):
+            # Create a new window for audio recording
+            self.audio_window = tk.Toplevel(self)
+            self.audio_window.title("Audio Recorder")
+            self.audio_window.geometry("300x200")
+
+            # Bind the close event to the toggle_recording function
+            # Source: https://tkdocs.com/tutorial/windows.html
+            # Intercepting the close button section
+            self.audio_window.protocol("WM_DELETE_WINDOW", self.toggle_recording_exit)
+
+            # Create a label to provide user directions
+            label = tk.Label(self.audio_window, text="Select the microphone icon to start recording audio")
+            label.pack()
+
+            # Create a record button that will start recording audio
+            self.record_button = tk.Button(self.audio_window, text="🎤", font=("Arial", 25, "bold"), command=self.toggle_recording, fg='black')
+            self.record_button.pack()
+            self.recording = False
+
+            # Add blank message label field
+            self.message_label = tk.Label(self.audio_window, text="")
+            self.message_label.pack()
+            # Increment count of windows
+            self.windowNum = self.windowNum + 1
+
+    # Toggle Recording Function
+    # This function was partially adapted from this source: https://www.youtube.com/watch?v=u_xNvC9PpHA& 
+    # Description: Toggles the recording of audio.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The audio recording is toggled to be True or False.
+    def toggle_recording(self):
+        # If recording is already in process, stop recording by setting recording to False
+        # This will interrupt the thread that is recording audio
+        if self.recording:
+            self.message_label.config(text="")
+            self.recording = False
+            self.record_button.config(fg='black')
+        # If recording is not in process, start recording by setting recording to True
+        # This will also start a new thread to record audio
+        else:
+            self.message_label.config(text="Recording in process...")
+            self.recording = True
+            # This source was used to learn how to start a new thread to record audio
+            # https://www.youtube.com/watch?v=u_xNvC9PpHA
+            threading.Thread(target=self.take_audio).start()
+            self.record_button.config(fg='red')
+    
+    # Toggle Recording Exit Function
+    # Description: This function is binded to the record audio window exit. It stops the recording of audio if it is in process.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The audio recording is set to False if it is True.
+    def toggle_recording_exit(self):
+        if self.recording:
+            self.recording = False
+        # Decrement count of recording windows
+        self.windowNum = self.windowNum - 1
+        # Source: https://www.geeksforgeeks.org/how-to-close-a-window-in-tkinter/
+        self.audio_window.destroy()
+
+    # Take Audio Function
+    # This function was partially adapted from this source: https://www.youtube.com/watch?v=u_xNvC9PpHA& 
+    # Description:
+    # Preconditions:
+    # Postconditions:
+    def take_audio(self):
+        # Takes audio while the thread is running
+        audio = pyaudio.PyAudio()
+        # Try block catches errors, such as a lack of a microphone connected or an unexpected issue while recording
+        try:
+            stream = audio.open(format=pyaudio.paInt16, channels=1, rate=44100,
+                                input=True, frames_per_buffer=1024)
+        except OSError as e:
+            self.recording = False
+            audio.terminate()
+            self.record_button.config(fg='black')
+            self.message_label.config(text="Error: No microphone detected")
+            return
         
+        # For tracking the time of recording
+        frames = []
+
+        # While recording (the thread is running)
+        while self.recording:
+            data = stream.read(1024)
+            frames.append(data)
+
+        # Arrives here when the thread is interrupted (the user selects the record button to stop)
+        # Stops audio stream and terminates
+        stream.stop_stream()
+        stream.close()
+        audio.terminate()
+
+        # Creates audio file
+        input_text = "audio.wav"
+        sound_file = wave.open(input_text, "wb")
+        sound_file.setnchannels(1)
+        sound_file.setsampwidth(audio.get_sample_size(pyaudio.paInt16))
+        sound_file.setframerate(44100)
+        sound_file.writeframes(b"".join(frames))
+        sound_file.close()
+    
+    # Transcribe Speech Function
+    # Description:
+    # Preconditions:
+    # Postconditions:
+    def transcribe_speech(self):
+        # obtain audio from the microphone
+        r = sr.Recognizer()
+        with sr.Microphone() as source:
+            print("Say something!")
+            audio = r.listen(source)
+
+        # recognize speech using whisper
+        try:
+            print("Whisper thinks you said " + r.recognize_whisper(audio, language="english"))
+        except sr.UnknownValueError:
+            print("Whisper could not understand audio")
+        except sr.RequestError as e:
+            print(f"Could not request results from Whisper; {e}")
+    def open_audio_file(self):  
+        try:
+            with wave.open("Audio.wav", "rb") as audio_file:
+                audio_data = audio_file.readframes(audio_file.getnframes())
+                print("Audio file opened successfully")
+        except FileNotFoundError:
+            print("Error: Audio file not found")        
+
 class DrawnNotePage(tk.Frame):
     # Initialization Function
     # Description: Initializes the DrawnNotePage class
@@ -374,6 +579,9 @@ class DrawnNotePage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.controller = controller
+        
+        # Set default line color
+        self.color = "black"
         
         # Create canvas area to draw notes
         self.canvas = tk.Canvas(self)
@@ -384,7 +592,6 @@ class DrawnNotePage(tk.Frame):
         self.canvas.bind("<B1-Motion>", self.add_line)
 
         self.lastx, self.lasty = None, None
-        self.color = "black"
 
     # Save Position Function
     # Description:
@@ -401,10 +608,15 @@ class DrawnNotePage(tk.Frame):
         if self.lastx and self.lasty:
             self.canvas.create_line((self.lastx, self.lasty, event.x, event.y), fill=self.color)
         self.save_posn(event)
-
+    
+    # Set Line Color Function
+    # Description:
+    # Preconditions:
+    # Postconditions:
     def set_line_color(self, line_color):
         self.color = line_color
 
+
 # Driver Code
 app = noteTaker()
-app.mainloop()
+app.mainloop() 
