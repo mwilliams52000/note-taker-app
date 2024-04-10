@@ -11,6 +11,7 @@ from spellchecker import SpellChecker
 import threading
 import pickle
 import pyaudio
+import os
 import wave
 from tkinter import ttk, Listbox, Scrollbar, Menu
 import speech_recognition as sr
@@ -155,6 +156,7 @@ class LandingPage(tk.Frame):
         file_menu = tk.Menu(menu_bar, tearoff=0)
         file_menu.add_command(label="Open")
         file_menu.add_command(label="Save")
+        file_menu.add_command(label="Export", command=self.controller.frames[TypedNotePage].export_typed_note)
         file_menu.add_separator()
     
         # Source: https://www.geeksforgeeks.org/how-to-close-a-window-in-tkinter/
@@ -204,7 +206,7 @@ class LandingPage(tk.Frame):
         # Create file menu
         file_menu = tk.Menu(menu_bar, tearoff=0)
         file_menu.add_command(label="Open")
-        file_menu.add_command(label="Save")
+        file_menu.add_command(label="Save", command=self.controller.frames[DrawnNotePage].export_drawn_note)
         file_menu.add_separator()
 
         # Source: https://www.geeksforgeeks.org/how-to-close-a-window-in-tkinter/
@@ -236,7 +238,6 @@ class TypedNotePage(tk.Frame):
 
         # Create word lists for TypedNotePage class
         self.wordsList = []
-        self.mispelledWords = False
 
         # Create text area to type notes
         self.text_area = tk.Text(self)
@@ -544,25 +545,87 @@ class TypedNotePage(tk.Frame):
         sound_file.setframerate(44100)
         sound_file.writeframes(b"".join(frames))
         sound_file.close()
+        
+        audio = self.open_audio_file()
+        # If the audio file was found and opened successfully, transcribe the speech
+        if (not(audio == False)):
+            text = self.transcribe_speech(audio)
+            # If the text was successfully transcribed, insert it into the text area and delete the audio file
+            if (not(text == False)):
+                self.text_area.insert(tk.END, text)
+                self.delete_audio_file()
     
     # Transcribe Speech Function
+    # Source: https://github.com/Uberi/speech_recognition/blob/master/examples/microphone_recognition.py
     # Description:
     # Preconditions:
     # Postconditions:
-    def transcribe_speech(self):
-        # obtain audio from the microphone
+    def transcribe_speech(self, audio):
         r = sr.Recognizer()
-        with sr.Microphone() as source:
-            print("Say something!")
-            audio = r.listen(source)
-
-        # recognize speech using whisper
+        # recognize speech using Google Speech Recognition
         try:
-            print("Whisper thinks you said " + r.recognize_whisper(audio, language="english"))
+            message = r.recognize_google(audio, language="english")
+            # Debug message
+            print("Google thinks you said '" + message + "'.")
+            return message
         except sr.UnknownValueError:
-            print("Whisper could not understand audio")
+            # Debug message
+            print("Google could not understand audio")
+            return False
         except sr.RequestError as e:
-            print(f"Could not request results from Whisper; {e}")
+            # Debug message
+            print(f"Could not request results from Google; {e}")
+            return False
+    
+    # Open Audio File Function
+    # Description: Opens the audio file.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The audio file is opened and returned if it can be opened. Else, False is returned.
+    def open_audio_file(self):  
+        try:
+            with wave.open("Audio.wav", "rb") as audio_file:
+                # Convert raw data to AudioData
+                audio_data = sr.AudioData(audio_file.readframes(audio_file.getnframes()), audio_file.getframerate(), audio_file.getsampwidth())
+                return audio_data
+        except FileNotFoundError:
+            # Debug message
+            print("Error: Audio file not found")  
+            return False
+    
+    # Delete Audio File Function
+    # Description: Deletes the audio file.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The audio file is deleted.
+    def delete_audio_file(self):
+        try:
+            os.remove("Audio.wav")
+        except FileNotFoundError:
+            # Debug message
+            print("Error: Audio file not found")
+    
+    # Export Typed Note Function
+    # Source: https://tkdocs.com/shipman/tkFileDialog.html
+    # Description: Allows the user to export the typed note to a .txt file
+    # Preconditions: Self must be passed as a parameter
+    # Postconditions: The typed note is exported to a .txt file
+    def export_typed_note(self):
+
+        typed_note_content = self.text_area.get("1.0", tk.END)
+
+        # Open a file dialog for the user to select the save location
+        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt")], title="Export as")
+
+        # If a file path is selected
+        if file_path:
+            try:
+                # Write the typed note content to the selected file
+                with open(file_path, "w") as file:
+                    file.write(typed_note_content)
+                # Show a success message
+                tk.messagebox.showinfo("Success", "Typed note exported successfully!")
+            except Exception as e:
+                # Show an error message if there's any issue with exporting
+                tk.messagebox.showerror("Error", f"An error occurred while exporting the typed note: {e}")
 
 class DrawnNotePage(tk.Frame):
     # Initialization Function
@@ -609,6 +672,23 @@ class DrawnNotePage(tk.Frame):
     def set_line_color(self, line_color):
         self.color = line_color
 
+    # Export Drawn Note Function
+    # Description: Allows the user to export the drawn note to a .png file.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The drawn note is exported to a .png file.
+    def export_drawn_note(self):
+        # Create a file dialog for the user to select the save location
+        file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Files", "*.png")])
+
+        if file_path:  # If user selected a file path
+            try:
+                # Create an image (screenshot) of the canvas and save it as a PNG file
+                self.canvas.postscript(file=file_path, colormode='color', title = "Save as")
+
+                tk.messagebox.showinfo("Success", "Typed note exported successfully!")
+
+            except Exception as e:
+                tk.messagebox.showerror("Error", f"An error occurred while exporting the drawn note: {e}")
 
 # Driver Code
 app = noteTaker()
