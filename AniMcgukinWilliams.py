@@ -154,7 +154,7 @@ class LandingPage(tk.Frame):
         # Create file menu
         file_menu = tk.Menu(menu_bar, tearoff=0)
         file_menu.add_command(label="Open")
-        file_menu.add_command(label="Save")
+        file_menu.add_command(label="Save", command=self.controller.frames[TypedNotePage].export_typed_note)
         file_menu.add_separator()
     
         # Source: https://www.geeksforgeeks.org/how-to-close-a-window-in-tkinter/
@@ -204,7 +204,7 @@ class LandingPage(tk.Frame):
         # Create file menu
         file_menu = tk.Menu(menu_bar, tearoff=0)
         file_menu.add_command(label="Open")
-        file_menu.add_command(label="Save")
+        file_menu.add_command(label="Save", command=self.controller.frames[DrawnNotePage].export_drawn_note)
         file_menu.add_separator()
 
         # Source: https://www.geeksforgeeks.org/how-to-close-a-window-in-tkinter/
@@ -263,6 +263,29 @@ class TypedNotePage(tk.Frame):
 
         # When the user types space or enter, add visible spelling errors
         self.text_area.bind("<space>", lambda event: self.space_control())
+
+    # Export Typed Note Function
+    # Description: Allows the user to export the typed note to a .txt file
+    # Preconditions: Self must be passed as a parameter
+    # Postconditions: The typed note is exported to a .txt file
+    def export_typed_note(self):
+
+        typed_note_content = self.text_area.get("1.0", tk.END)
+
+        # Open a file dialog for the user to select the save location
+        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt")])
+
+        # If a file path is selected
+        if file_path:
+            try:
+                # Write the typed note content to the selected file
+                with open(file_path, "w") as file:
+                    file.write(typed_note_content)
+                # Show a success message
+                tk.messagebox.showinfo("Success", "Typed note exported successfully!")
+            except Exception as e:
+                # Show an error message if there's any issue with exporting
+                tk.messagebox.showerror("Error", f"An error occurred while exporting the typed note: {e}")
 
     # Key Release Return Control Function
     # Description: Checks if the previous line is bulleted and identifies misspelled words by calling related functions.
@@ -592,6 +615,24 @@ class DrawnNotePage(tk.Frame):
         self.canvas.bind("<B1-Motion>", self.add_line)
 
         self.lastx, self.lasty = None, None
+
+    # Export Drawn Note Function
+    # Description: Allows the user to export the drawn note to a .png file.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The drawn note is exported to a .png file.
+    def export_drawn_note(self):
+        # Create a file dialog for the user to select the save location
+        file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Files", "*.png")])
+
+        if file_path:  # If user selected a file path
+            try:
+                # Create an image (screenshot) of the canvas and save it as a PNG file
+                self.canvas.postscript(file=file_path, colormode='color')
+                
+                tk.messagebox.showinfo("Success", "Typed note exported successfully!")
+                
+            except Exception as e:
+                tk.messagebox.showerror("Error", f"An error occurred while exporting the drawn note: {e}")
 
     # Save Position Function
     # Description:
