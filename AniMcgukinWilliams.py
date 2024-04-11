@@ -26,7 +26,7 @@ LARGEFONT =("Verdana", 25)
 class noteTaker(tk.Tk):
     # Initialization Function
     # Description: Initializes the noteTaker class and creates a container for the frames.
-    # Preconditions: None
+    # Preconditions: Self and arguments must be passed as parameters.
     # Postconditions: None
     def __init__(self, *args, **kwargs):
         # __init__ function for class Tk
@@ -179,13 +179,13 @@ class LandingPage(tk.Frame):
 
         # Create color menu
         color_menu = tk.Menu(menu_bar, tearoff=0)
-        color_menu.add_command(label="Default")
-        color_menu.add_command(label="Red")
-        color_menu.add_command(label="Blue")
-        color_menu.add_command(label="Green")
-        color_menu.add_command(label="Yellow")
-        color_menu.add_command(label="Purple")
-        color_menu.add_command(label="White")
+        color_menu.add_command(label="Default", command=lambda: self.controller.frames[TypedNotePage].change_color("black"))
+        color_menu.add_command(label="Red", command=lambda: self.controller.frames[TypedNotePage].change_color("red"))
+        color_menu.add_command(label="Blue", command=lambda: self.controller.frames[TypedNotePage].change_color("blue"))
+        color_menu.add_command(label="Green", command=lambda: self.controller.frames[TypedNotePage].change_color("green"))
+        color_menu.add_command(label="Yellow", command=lambda: self.controller.frames[TypedNotePage].change_color("yellow"))
+        color_menu.add_command(label="Purple", command=lambda: self.controller.frames[TypedNotePage].change_color("purple"))
+        color_menu.add_command(label="Pink", command=lambda: self.controller.frames[TypedNotePage].change_color("pink"))
         menu_bar.add_cascade(label="Color", menu=color_menu)
 
         # Create transcribe speech menu
@@ -221,7 +221,7 @@ class LandingPage(tk.Frame):
         color_menu.add_command(label="Green", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("green"))
         color_menu.add_command(label="Yellow", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("yellow"))
         color_menu.add_command(label="Purple", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("purple"))
-        color_menu.add_command(label="White", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("white"))
+        color_menu.add_command(label="Pink", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("pink"))
 
         menu_bar.add_cascade(label="Color", menu=color_menu)
 
@@ -249,7 +249,7 @@ class TypedNotePage(tk.Frame):
 
         # When the user types into the keybaord, check if the previous character is underlined
         # If it is, underline this current character as well
-        self.text_area.bind("<Key>", lambda event: self.is_prev_char_underlined())
+        self.text_area.bind("<Key>", lambda event: self.key_control())
 
         # When the user types into the keyboard, manage the strings in the text area
         self.text_area.bind("<KeyRelease>", lambda event: self.manage_text_area_strings())
@@ -282,12 +282,22 @@ class TypedNotePage(tk.Frame):
         self.identify_misspelled_words()
     
     # Space Control Function
-    # Description: Identifies misspelled words and checks if the previous character is underlined by calling related functions.
+    # Description: Identifies misspelled words and checks if the previous character is underlined or colored 
+    # by calling related functions.
     # Preconditions: Self must be passed as a parameter.
-    # Postconditions: Misspelled words are identified and the current character is underlined if needed.
+    # Postconditions: Misspelled words are identified and the current character is underlined or colored if needed.
     def space_control(self):
         self.identify_misspelled_words()
         self.is_prev_char_underlined()
+        self.is_prev_char_colored()
+    
+    # Key Control Function
+    # Description: Checks if the previous character is underlined or colored by calling related functions.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The current character is underlined or colored if needed.
+    def key_control(self):
+        self.is_prev_char_underlined()
+        self.is_prev_char_colored()
 
     # Underline Text Function
     # Description: Underlines the selected text in the text area.
@@ -305,6 +315,28 @@ class TypedNotePage(tk.Frame):
             self.text_area.tag_add("underline", current_selection[0], current_selection[1])
             self.text_area.tag_configure("underline", underline=True)
     
+    # Change Color Function
+    # Description: This function changes the color of the highlighted text to the new passed in one.
+    # Preconditions: Self and the color string must be passed as parameters.
+    # Postconditions: The color of the text is changed.
+    def change_color(self, color):
+        # Get the current selection
+        current_selection = self.text_area.tag_ranges(tk.SEL)
+    
+        # List of supported colors
+        colors = ["red", "blue", "green", "yellow", "purple", "pink", "black"]
+    
+        # For every color in the list of colors, remove the tag if it is present
+        for col in colors:
+            if current_selection:
+                if col in self.text_area.tag_names(current_selection[0]):
+                    self.text_area.tag_remove(col, current_selection[0], current_selection[1])
+    
+        # If there is a selection, add the color
+        if current_selection:
+            self.text_area.tag_add(color, current_selection[0], current_selection[1])
+            self.text_area.tag_config(color, foreground = color)
+
     # Remove Underline Text Function
     # Description: Removes the underline from the selected text in the text area.
     # Preconditions:
@@ -365,6 +397,46 @@ class TypedNotePage(tk.Frame):
             self.text_area.tag_add("underline", current_index)
             self.text_area.tag_configure("underline", underline=True)
     
+    # Is Previous Character Colored
+    # Description: Checks if the previous character is colored If it is, color the current character.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The current character is colored if the previous character is colored.
+    def is_prev_char_colored(self):
+        # Get the current index of the typing cursor
+        current_index = self.text_area.index(tk.INSERT)
+        # Get the index of the previous character
+        prev_char_index = "{}.{}".format(current_index.split('.')[0], int(current_index.split('.')[1]) - 1)
+
+        # Check if the previous character has the color tag
+        if "red" in self.text_area.tag_names(prev_char_index):
+            # If it is, color the current character as well
+            self.text_area.tag_add("red", current_index)
+            self.text_area.tag_configure("red", foreground = "red")
+        elif "blue" in self.text_area.tag_names(prev_char_index):
+            # If it is, color the current character as well
+            self.text_area.tag_add("blue", current_index)
+            self.text_area.tag_configure("blue", foreground = "blue")
+        elif "green" in self.text_area.tag_names(prev_char_index):
+            # If it is, color the current character as well
+            self.text_area.tag_add("green", current_index)
+            self.text_area.tag_configure("green", foreground = "green")
+        elif "yellow" in self.text_area.tag_names(prev_char_index):
+            # If it is, color the current character as well
+            self.text_area.tag_add("yellow", current_index)
+            self.text_area.tag_configure("yellow", foreground = "yellow")
+        elif "purple" in self.text_area.tag_names(prev_char_index):
+            # If it is, color the current character as well
+            self.text_area.tag_add("purple", current_index)
+            self.text_area.tag_configure("purple", foreground = "purple")
+        elif "pink" in self.text_area.tag_names(prev_char_index):
+            # If it is, color the current character as well
+            self.text_area.tag_add("pink", current_index)
+            self.text_area.tag_configure("pink", foreground = "pink")
+        else:
+            # Use default color
+            self.text_area.tag_add("black", current_index)
+            self.text_area.tag_configure("black", foreground = "black")
+    
     # Manage Text Area Strings
     # Description: Adds and removes strings into the class's list of words.
     # Precondition: Self must be passed as a parameter.
@@ -397,6 +469,8 @@ class TypedNotePage(tk.Frame):
     # Preconditions: Class self must be passed as a parameter.
     # Postconditions: Unknown words are identified and tagged in text area.
     def identify_misspelled_words(self):
+        # Update wordsList
+        self.manage_text_area_strings()
         # Get SpellChecker object
         spell = SpellChecker()
         # From the class's word list, find words not in dictionary
