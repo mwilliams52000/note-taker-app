@@ -154,8 +154,8 @@ class LandingPage(tk.Frame):
 
         # Create file menu
         file_menu = tk.Menu(menu_bar, tearoff=0)
-        file_menu.add_command(label="Open")
-        file_menu.add_command(label="Save")
+        file_menu.add_command(label="Open", command = lambda: self.controller.frames[TypedNotePage].load_note_driver())
+        file_menu.add_command(label="Save", command = lambda: self.controller.frames[TypedNotePage].save_note_driver())
         file_menu.add_command(label="Export", command=self.controller.frames[TypedNotePage].export_typed_note)
         file_menu.add_separator()
     
@@ -235,6 +235,7 @@ class TypedNotePage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.windowNum = 0
+        self.controller = controller
 
         # Create word lists for TypedNotePage class
         self.wordsList = []
@@ -700,12 +701,188 @@ class TypedNotePage(tk.Frame):
             except Exception as e:
                 # Show an error message if there's any issue with exporting
                 tk.messagebox.showerror("Error", f"An error occurred while exporting the typed note: {e}")
+    
+    # Save Typed Note Function
+    # Description:
+    # Preconditions:
+    # Postconditions:
+    def save_typed_note(self):
+        # Open a file dialog for the user to select the save location
+        file_path = filedialog.asksaveasfilename(defaultextension=".dat", filetypes=[("Data Files", "*.dat")], title="Save as")
+        # If a file path is selected
+        if file_path:
+            try:
+                # Show a success message
+                tk.messagebox.showinfo("Success", "Typed note saved successfully!")
+                # Get name of file path without the directory path or extension
+                file_name = os.path.splitext(os.path.basename(file_path))[0]
+                # Set the window title to the file name
+                self.controller.title(file_name + " - Note-Taker App")
+                return file_path
+            except Exception as e:
+                # Show an error message if there's any issue with saving
+                tk.messagebox.showerror("Error", f"An error occurred while saving the typed note: {e}")
+    
+    # Load Typed Note Function
+    # Description:
+    # Preconditions:
+    # Postconditions:
+    def load_typed_note(self):
+        # Open a file dialog for the user to select the load location
+        file_path = filedialog.askopenfilename(defaultextension=".dat", filetypes=[("Data Files", "*.dat")], title="Load File")
+        # If a file path is selected
+        if file_path:
+            try:
+                # Show a success message
+                tk.messagebox.showinfo("Success", "Typed note successfully opened!")
+                # Get name of file path without the directory path or extension
+                file_name = os.path.splitext(os.path.basename(file_path))[0]
+                # Set the window title to the file name
+                self.controller.title(file_name + " - Note-Taker App")
+                return file_path
+            except Exception as e:
+                # Show an error message if there's any issue with opening
+                tk.messagebox.showerror("Error", f"An error occurred while opening the typed note: {e}")
+
+    # Create Pickle File Function
+    # Description:
+    # Preconditions:
+    # Postconditions:
+    def create_pickle_file(self, file_name):
+        # Open file for binary writing
+        data_file = open(file_name, 'wb')
+        # Get note content
+        typed_note_content = self.text_area.get("1.0", tk.END)
+        # Add typed note content to pickle file
+        pickle.dump(typed_note_content, data_file)
+        # Get index of every underlined sequence and put into a tuple
+        underline_ranges = tuple(str(index) for index in self.text_area.tag_ranges("underline"))
+        # Add underlined sequences to pickle file
+        pickle.dump(underline_ranges, data_file)
+        # Repeat the process for other colors
+        red_ranges = tuple(str(index) for index in self.text_area.tag_ranges("red"))
+        pickle.dump(red_ranges, data_file)
+        blue_ranges = tuple(str(index) for index in self.text_area.tag_ranges("blue"))
+        pickle.dump(blue_ranges, data_file)
+        green_ranges = tuple(str(index) for index in self.text_area.tag_ranges("green"))
+        pickle.dump(green_ranges, data_file)
+        yellow_ranges = tuple(str(index) for index in self.text_area.tag_ranges("yellow"))
+        pickle.dump(yellow_ranges, data_file)
+        purple_ranges = tuple(str(index) for index in self.text_area.tag_ranges("purple"))
+        pickle.dump(purple_ranges, data_file)
+        pink_ranges = tuple(str(index) for index in self.text_area.tag_ranges("pink"))
+        pickle.dump(pink_ranges, data_file)
+        # Close file
+        data_file.close()
+    
+    # Open Pickle File Function
+    # Description:
+    # Preconditions:
+    # Postconditions:
+    def open_pickle_file(self, file_name):
+        # Open file for binary reading
+        data_file = open(file_name, 'rb')
+        # Load typed note content
+        typed_note_content = pickle.load(data_file)
+        # Load underlined sequences
+        underline_ranges = pickle.load(data_file)
+        # Load color sequences
+        red_ranges = pickle.load(data_file)
+        blue_ranges = pickle.load(data_file)
+        green_ranges = pickle.load(data_file)
+        yellow_ranges = pickle.load(data_file)
+        purple_ranges = pickle.load(data_file)
+        pink_ranges = pickle.load(data_file)
+        # Close file
+        data_file.close()
+        # Wipe text area clean
+        self.text_area.delete("1.0", tk.END)
+        # Insert typed note content into text area
+        self.text_area.insert(tk.END, typed_note_content)
+        # Add underlined sequences back to text area
+        i = 0
+        # Add underlined sequences back to text area
+        while(i < len(underline_ranges) - 1):
+            # As the tuple consists of start and end pairs, add the tag to the text area
+            # in pairs of two, then increment i counter by 2
+            self.text_area.tag_add("underline", underline_ranges[i], underline_ranges[i+1])
+            self.text_area.tag_configure("underline", underline=True)
+            i += 2
+        # Add red sequences back to text area
+        i = 0
+        while(i < len(red_ranges) - 1):
+            # As the tuple consists of start and end pairs, add the tag to the text area
+            # in pairs of two, then increment i counter by 2
+            self.text_area.tag_add("red", red_ranges[i], red_ranges[i+1])
+            self.text_area.tag_configure("red", foreground = "red")
+            i += 2
+        # Add blue sequences back to text area
+        i = 0
+        while(i < len(blue_ranges) - 1):
+            # As the tuple consists of start and end pairs, add the tag to the text area
+            # in pairs of two, then increment i counter by 2
+            self.text_area.tag_add("blue", blue_ranges[i], blue_ranges[i+1])
+            self.text_area.tag_configure("blue", foreground = "blue")
+            i += 2
+        # Add green sequences back to text area
+        i = 0
+        while(i < len(green_ranges) - 1):
+            # As the tuple consists of start and end pairs, add the tag to the text area
+            # in pairs of two, then increment i counter by 2
+            self.text_area.tag_add("green", green_ranges[i], green_ranges[i+1])
+            self.text_area.tag_configure("green", foreground = "green")
+            i += 2
+        # Add yellow sequences back to text area
+        i = 0
+        while(i < len(yellow_ranges) - 1):
+            # As the tuple consists of start and end pairs, add the tag to the text area
+            # in pairs of two, then increment i counter by 2
+            self.text_area.tag_add("yellow", yellow_ranges[i], yellow_ranges[i+1])
+            self.text_area.tag_configure("yellow", foreground = "yellow")
+            i += 2
+        # Add purple sequences back to text area
+        i = 0
+        while(i < len(purple_ranges) - 1):
+            # As the tuple consists of start and end pairs, add the tag to the text area
+            # in pairs of two, then increment i counter by 2
+            self.text_area.tag_add("purple", purple_ranges[i], purple_ranges[i+1])
+            self.text_area.tag_configure("purple", foreground = "purple")
+            i += 2
+        # Add pink sequences back to text area
+        i = 0
+        while(i < len(pink_ranges) - 1):
+            # As the tuple consists of start and end pairs, add the tag to the text area
+            # in pairs of two, then increment i counter by 2
+            self.text_area.tag_add("pink", pink_ranges[i], pink_ranges[i+1])
+            self.text_area.tag_configure("pink", foreground = "pink")
+            i += 2
+    
+    # Save Note Driver Function
+    # Description: This function is the driver for saving a typed note.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The typed note is saved.
+    def save_note_driver(self):
+        # Launch window for user to save a typed note
+        # Set "saved_file" to file location
+        saved_file = self.save_typed_note()
+        # Create a pickle file and save it to file location
+        self.create_pickle_file(saved_file)
+    
+    # Load Note Driver Function
+    # Description:
+    # Preconditions:
+    # Postconditions:
+    def load_note_driver(self):
+        # Launch window for user to load a typed note
+        opened_file = self.load_typed_note()
+        # Open a pickle file and load it
+        self.open_pickle_file(opened_file)
 
 class DrawnNotePage(tk.Frame):
     # Initialization Function
     # Description: Initializes the DrawnNotePage class
-    # Preconditions: None
-    # Postconditions: None
+    # Preconditions: 
+    # Postconditions: 
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.controller = controller
