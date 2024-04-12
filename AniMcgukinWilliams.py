@@ -165,7 +165,7 @@ class LandingPage(tk.Frame):
 
         # Create Edit menu
         edit_menu = tk.Menu(menu_bar, tearoff=0)
-        edit_menu.add_command(label="Undo")
+        edit_menu.add_command(label="Undo", command=self.controller.frames[TypedNotePage].undo)
         edit_menu.add_command(label="Redo")
         edit_menu.add_separator()
         edit_menu.add_command(label="Underline Text", command=self.controller.frames[TypedNotePage].underline_text)
@@ -265,6 +265,7 @@ class TypedNotePage(tk.Frame):
 
         # When the user types space or enter, add visible spelling errors
         self.text_area.bind("<space>", lambda event: self.space_control())
+        self.text_hisotry = []
 
     # Key Release Return Control Function
     # Description: Checks if the previous line is bulleted and identifies misspelled words by calling related functions.
@@ -273,6 +274,7 @@ class TypedNotePage(tk.Frame):
     def key_release_return_control(self):
         self.is_prev_line_bulleted()
         self.identify_misspelled_words()
+        self.manage_text_area_strings()
     
     # Button 1 Control Function
     # Description: Manages the text area strings and identifies misspelled words by calling related functions.
@@ -463,6 +465,7 @@ class TypedNotePage(tk.Frame):
                 self.wordsList.append(i)
         # Sort the class's word list
         self.wordsList.sort()
+        
     
     # Identify Misspelled Words Function
     # Description: This function identifies unknown words in the class's word list and then adds a visible indictaor
@@ -877,6 +880,10 @@ class TypedNotePage(tk.Frame):
         opened_file = self.load_typed_note()
         # Open a pickle file and load it
         self.open_pickle_file(opened_file)
+    def undo(self):
+        if self.text_history:
+            self.text_area.delete("1.0", tk.END)
+            self.text_area.insert(tk.END, self.text_history.pop())
 
 class DrawnNotePage(tk.Frame):
     # Initialization Function
