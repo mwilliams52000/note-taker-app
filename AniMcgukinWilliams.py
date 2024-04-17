@@ -165,16 +165,16 @@ class LandingPage(tk.Frame):
 
         # Create Edit menu
         edit_menu = tk.Menu(menu_bar, tearoff=0)
-        edit_menu.add_command(label="Undo")
-        edit_menu.add_command(label="Redo")
+        edit_menu.add_command(label="Undo", command=self.controller.frames[TypedNotePage].typed_note_undo)
+        edit_menu.add_command(label="Redo", command=self.controller.frames[TypedNotePage].typed_note_redo)
         edit_menu.add_separator()
         edit_menu.add_command(label="Underline Text", command=self.controller.frames[TypedNotePage].underline_text)
         edit_menu.add_command(label="Remove Underline", command=self.controller.frames[TypedNotePage].remove_underline_text)
         edit_menu.add_command(label="Add Bullet Point", command=self.controller.frames[TypedNotePage].add_bullet_point)
         edit_menu.add_separator()
-        edit_menu.add_command(label="Cut")
-        edit_menu.add_command(label="Copy")
-        edit_menu.add_command(label="Paste")
+        edit_menu.add_command(label="Cut", command=self.controller.frames[TypedNotePage].typed_note_cut)
+        edit_menu.add_command(label="Copy", command=self.controller.frames[TypedNotePage].typed_note_copy)
+        edit_menu.add_command(label="Paste", command=self.controller.frames[TypedNotePage].typed_note_paste)
         menu_bar.add_cascade(label="Edit", menu=edit_menu)
 
         # Create color menu
@@ -241,7 +241,7 @@ class TypedNotePage(tk.Frame):
         self.wordsList = []
 
         # Create text area to type notes
-        self.text_area = tk.Text(self)
+        self.text_area = tk.Text(self, undo=True)
         self.text_area.pack(expand=True, fill='both')
 
         # Bind keyboard actions to buttons
@@ -542,6 +542,11 @@ class TypedNotePage(tk.Frame):
             # Add blank message label field
             self.message_label = tk.Label(self.audio_window, text="")
             self.message_label.pack()
+
+            # Add an "Undo button" to undo the last action
+            undo_button = tk.Button(self.audio_window, text="Undo Addition", command=self.typed_note_undo)
+            undo_button.pack()
+
             # Increment count of windows
             self.windowNum = self.windowNum + 1
 
@@ -703,12 +708,12 @@ class TypedNotePage(tk.Frame):
                 tk.messagebox.showerror("Error", f"An error occurred while exporting the typed note: {e}")
     
     # Save Typed Note Function
-    # Description:
-    # Preconditions:
-    # Postconditions:
+    # Description: Opens a file dialog for the user to select the save location. They can select a .typ file to save.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The file path is returned if a file is selected.
     def save_typed_note(self):
         # Open a file dialog for the user to select the save location
-        file_path = filedialog.asksaveasfilename(defaultextension=".dat", filetypes=[("Data Files", "*.dat")], title="Save as")
+        file_path = filedialog.asksaveasfilename(defaultextension=".typ", filetypes=[("Typed Note Files", "*.typ")], title="Save as")
         # If a file path is selected
         if file_path:
             try:
@@ -724,12 +729,12 @@ class TypedNotePage(tk.Frame):
                 tk.messagebox.showerror("Error", f"An error occurred while saving the typed note: {e}")
     
     # Load Typed Note Function
-    # Description:
-    # Preconditions:
-    # Postconditions:
+    # Description: Opens a file dialog for the user to select the load location. They can select a .typ file to load.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The file path is returned if a file is selected.
     def load_typed_note(self):
         # Open a file dialog for the user to select the load location
-        file_path = filedialog.askopenfilename(defaultextension=".dat", filetypes=[("Data Files", "*.dat")], title="Load File")
+        file_path = filedialog.askopenfilename(defaultextension=".typ", filetypes=[("Typed Note Files", "*.typ")], title="Load File")
         # If a file path is selected
         if file_path:
             try:
@@ -745,9 +750,9 @@ class TypedNotePage(tk.Frame):
                 tk.messagebox.showerror("Error", f"An error occurred while opening the typed note: {e}")
 
     # Create Pickle File Function
-    # Description:
-    # Preconditions:
-    # Postconditions:
+    # Description: Creates a pickle file with the typed note content and the underlined/color sequences.
+    # Preconditions: Self and the file name must be passed as parameters.
+    # Postconditions: A pickle file is created with the typed note content and the underlined/color sequences saved as a string and tuples.
     def create_pickle_file(self, file_name):
         # Open file for binary writing
         data_file = open(file_name, 'wb')
@@ -776,86 +781,154 @@ class TypedNotePage(tk.Frame):
         data_file.close()
     
     # Open Pickle File Function
-    # Description:
-    # Preconditions:
-    # Postconditions:
+    # Description: Loads information from a pickle file. It inserts the typed note content into the text area and then adds the underlined/color sequences back to the text area.
+    # Preconditions: Self and the file name must be passed as parameters.
+    # Postconditions: The typed note content is updated to be the content of the pickle file.
     def open_pickle_file(self, file_name):
-        # Open file for binary reading
-        data_file = open(file_name, 'rb')
-        # Load typed note content
-        typed_note_content = pickle.load(data_file)
-        # Load underlined sequences
-        underline_ranges = pickle.load(data_file)
-        # Load color sequences
-        red_ranges = pickle.load(data_file)
-        blue_ranges = pickle.load(data_file)
-        green_ranges = pickle.load(data_file)
-        yellow_ranges = pickle.load(data_file)
-        purple_ranges = pickle.load(data_file)
-        pink_ranges = pickle.load(data_file)
-        # Close file
-        data_file.close()
-        # Wipe text area clean
-        self.text_area.delete("1.0", tk.END)
-        # Insert typed note content into text area
-        self.text_area.insert(tk.END, typed_note_content)
-        # Add underlined sequences back to text area
-        i = 0
-        # Add underlined sequences back to text area
-        while(i < len(underline_ranges) - 1):
-            # As the tuple consists of start and end pairs, add the tag to the text area
-            # in pairs of two, then increment i counter by 2
-            self.text_area.tag_add("underline", underline_ranges[i], underline_ranges[i+1])
-            self.text_area.tag_configure("underline", underline=True)
-            i += 2
-        # Add red sequences back to text area
-        i = 0
-        while(i < len(red_ranges) - 1):
-            # As the tuple consists of start and end pairs, add the tag to the text area
-            # in pairs of two, then increment i counter by 2
-            self.text_area.tag_add("red", red_ranges[i], red_ranges[i+1])
-            self.text_area.tag_configure("red", foreground = "red")
-            i += 2
-        # Add blue sequences back to text area
-        i = 0
-        while(i < len(blue_ranges) - 1):
-            # As the tuple consists of start and end pairs, add the tag to the text area
-            # in pairs of two, then increment i counter by 2
-            self.text_area.tag_add("blue", blue_ranges[i], blue_ranges[i+1])
-            self.text_area.tag_configure("blue", foreground = "blue")
-            i += 2
-        # Add green sequences back to text area
-        i = 0
-        while(i < len(green_ranges) - 1):
-            # As the tuple consists of start and end pairs, add the tag to the text area
-            # in pairs of two, then increment i counter by 2
-            self.text_area.tag_add("green", green_ranges[i], green_ranges[i+1])
-            self.text_area.tag_configure("green", foreground = "green")
-            i += 2
-        # Add yellow sequences back to text area
-        i = 0
-        while(i < len(yellow_ranges) - 1):
-            # As the tuple consists of start and end pairs, add the tag to the text area
-            # in pairs of two, then increment i counter by 2
-            self.text_area.tag_add("yellow", yellow_ranges[i], yellow_ranges[i+1])
-            self.text_area.tag_configure("yellow", foreground = "yellow")
-            i += 2
-        # Add purple sequences back to text area
-        i = 0
-        while(i < len(purple_ranges) - 1):
-            # As the tuple consists of start and end pairs, add the tag to the text area
-            # in pairs of two, then increment i counter by 2
-            self.text_area.tag_add("purple", purple_ranges[i], purple_ranges[i+1])
-            self.text_area.tag_configure("purple", foreground = "purple")
-            i += 2
-        # Add pink sequences back to text area
-        i = 0
-        while(i < len(pink_ranges) - 1):
-            # As the tuple consists of start and end pairs, add the tag to the text area
-            # in pairs of two, then increment i counter by 2
-            self.text_area.tag_add("pink", pink_ranges[i], pink_ranges[i+1])
-            self.text_area.tag_configure("pink", foreground = "pink")
-            i += 2
+        try:
+            # Open file for binary reading
+            data_file = open(file_name, 'rb')
+            # Load typed note content
+            typed_note_content = pickle.load(data_file)
+            # Load underlined sequences
+            underline_ranges = pickle.load(data_file)
+            # Load color sequences
+            red_ranges = pickle.load(data_file)
+            blue_ranges = pickle.load(data_file)
+            green_ranges = pickle.load(data_file)
+            yellow_ranges = pickle.load(data_file)
+            purple_ranges = pickle.load(data_file)
+            pink_ranges = pickle.load(data_file)
+            # Close file
+            data_file.close()
+            # Wipe text area clean
+            self.text_area.delete("1.0", tk.END)
+            # Insert typed note content into text area
+            self.text_area.insert(tk.END, typed_note_content)
+            # Add underlined sequences back to text area
+            i = 0
+            # Add underlined sequences back to text area
+            while(i < len(underline_ranges) - 1):
+                # As the tuple consists of start and end pairs, add the tag to the text area
+                # in pairs of two, then increment i counter by 2
+                self.text_area.tag_add("underline", underline_ranges[i], underline_ranges[i+1])
+                self.text_area.tag_configure("underline", underline=True)
+                i += 2
+            # Add red sequences back to text area
+            i = 0
+            while(i < len(red_ranges) - 1):
+                # As the tuple consists of start and end pairs, add the tag to the text area
+                # in pairs of two, then increment i counter by 2
+                self.text_area.tag_add("red", red_ranges[i], red_ranges[i+1])
+                self.text_area.tag_configure("red", foreground = "red")
+                i += 2
+            # Add blue sequences back to text area
+            i = 0
+            while(i < len(blue_ranges) - 1):
+                # As the tuple consists of start and end pairs, add the tag to the text area
+                # in pairs of two, then increment i counter by 2
+                self.text_area.tag_add("blue", blue_ranges[i], blue_ranges[i+1])
+                self.text_area.tag_configure("blue", foreground = "blue")
+                i += 2
+            # Add green sequences back to text area
+            i = 0
+            while(i < len(green_ranges) - 1):
+                # As the tuple consists of start and end pairs, add the tag to the text area
+                # in pairs of two, then increment i counter by 2
+                self.text_area.tag_add("green", green_ranges[i], green_ranges[i+1])
+                self.text_area.tag_configure("green", foreground = "green")
+                i += 2
+            # Add yellow sequences back to text area
+            i = 0
+            while(i < len(yellow_ranges) - 1):
+                # As the tuple consists of start and end pairs, add the tag to the text area
+                # in pairs of two, then increment i counter by 2
+                self.text_area.tag_add("yellow", yellow_ranges[i], yellow_ranges[i+1])
+                self.text_area.tag_configure("yellow", foreground = "yellow")
+                i += 2
+            # Add purple sequences back to text area
+            i = 0
+            while(i < len(purple_ranges) - 1):
+                # As the tuple consists of start and end pairs, add the tag to the text area
+                # in pairs of two, then increment i counter by 2
+                self.text_area.tag_add("purple", purple_ranges[i], purple_ranges[i+1])
+                self.text_area.tag_configure("purple", foreground = "purple")
+                i += 2
+            # Add pink sequences back to text area
+            i = 0
+            while(i < len(pink_ranges) - 1):
+                # As the tuple consists of start and end pairs, add the tag to the text area
+                # in pairs of two, then increment i counter by 2
+                self.text_area.tag_add("pink", pink_ranges[i], pink_ranges[i+1])
+                self.text_area.tag_configure("pink", foreground = "pink")
+                i += 2
+        except:
+            return
+    
+    # Typed Note Paste Function
+    # Partially adapted from this source: https://stackoverflow.com/questions/73059188/copying-and-pasting-text-displayed-on-tkinter-text-widget:
+    # Description: This function pastes the copied text into the text area.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The copied text is pasted into the text area.
+    def typed_note_paste(self):
+        # If there is an item in the clipboard, paste it into the text area
+        try:
+            self.text_area.insert('end', self.selection_get(selection='CLIPBOARD'))
+        except:
+            return
+    
+    # Typed Note Copy Function
+    # Partially adapted from this source: https://stackoverflow.com/questions/73059188/copying-and-pasting-text-displayed-on-tkinter-text-widget:
+    # Description: This function copies the selected text in the text area.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The selected text is copied.
+    def typed_note_copy(self):
+        # If there is a selection, copy it to clipboard
+        try:
+            content = self.selection_get()
+            self.clipboard_clear()
+            self.clipboard_append(content)  
+        except:
+            return
+    
+    # Typed Note Cut Function
+    # Partially adapted from this source: https://stackoverflow.com/questions/73059188/copying-and-pasting-text-displayed-on-tkinter-text-widget:
+    # Description: This function cuts the selected text in the text area.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The selected text is cut.
+    def typed_note_cut(self):
+        # If there is a selection, cut it from the text area
+        try:
+            content = self.selection_get()
+            self.clipboard_clear()
+            self.clipboard_append(content)
+            self.text_area.delete('sel.first', 'sel.last')
+        except:
+            return
+    
+    # Typed Note Undo Function
+    # Source: https://tkdocs.com/tutorial/text.html
+    # See section "Modifications, Undo and Redo"
+    # Description: This function undoes the last action in the text area.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The last action is undone.
+    def typed_note_undo(self):
+        try:
+            self.text_area.edit_undo()
+        except:
+            return
+    
+    # Typed Note Redo Function
+    # Source: https://tkdocs.com/tutorial/text.html
+    # See section "Modifications, Undo and Redo"
+    # Description: This function redoes the last action in the text area.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The last action is redone.
+    def typed_note_redo(self):
+        try:
+            self.text_area.edit_redo()
+        except:
+            return
     
     # Save Note Driver Function
     # Description: This function is the driver for saving a typed note.
@@ -869,9 +942,9 @@ class TypedNotePage(tk.Frame):
         self.create_pickle_file(saved_file)
     
     # Load Note Driver Function
-    # Description:
-    # Preconditions:
-    # Postconditions:
+    # Description: This function is the driver for loading a typed note.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The typed note is loaded.
     def load_note_driver(self):
         # Launch window for user to load a typed note
         opened_file = self.load_typed_note()
