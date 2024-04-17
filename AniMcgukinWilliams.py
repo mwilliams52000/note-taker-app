@@ -16,6 +16,7 @@ import wave
 from tkinter import ttk, Listbox, Scrollbar, Menu
 import speech_recognition as sr
 from tkinter import ttk, Menu, font
+from PIL import Image, ImageTk
 
 # Font for landing page title
 LARGEFONT =("Verdana", 25)
@@ -205,8 +206,9 @@ class LandingPage(tk.Frame):
 
         # Create file menu
         file_menu = tk.Menu(menu_bar, tearoff=0)
-        file_menu.add_command(label="Open")
-        file_menu.add_command(label="Save", command=self.controller.frames[DrawnNotePage].export_drawn_note)
+        file_menu.add_command(label="Open", command=self.controller.frames[DrawnNotePage].load_drawn_note)
+        file_menu.add_command(label="Save", command=self.controller.frames[DrawnNotePage].save_drawn_note)
+        file_menu.add_command(label="Export", command=self.controller.frames[DrawnNotePage].export_drawn_note)
         file_menu.add_separator()
 
         # Source: https://www.geeksforgeeks.org/how-to-close-a-window-in-tkinter/
@@ -1007,12 +1009,85 @@ class DrawnNotePage(tk.Frame):
         if file_path:  # If user selected a file path
             try:
                 # Create an image (screenshot) of the canvas and save it as a PNG file
-                self.canvas.postscript(file=file_path, colormode='color', title = "Save as")
+                self.canvas.postscript(file=file_path, colormode='color')
 
                 tk.messagebox.showinfo("Success", "Typed note exported successfully!")
 
             except Exception as e:
                 tk.messagebox.showerror("Error", f"An error occurred while exporting the drawn note: {e}")
+
+    # Save Drawn Note Function
+    # Description: Opens a file dialog for the user to select the save location. They can select a . file to save.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The file path is returned if a file is selected.
+    def save_drawn_note(self):
+        # Open a file dialog for the user to select the save location
+        file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("Drawn Note Files", "*.png")], title="Save as")
+        # If a file path is selected
+        if file_path:
+            try:
+                # Take a screenshot of the canvas and save it as a PNG file
+                self.canvas.postscript(file=file_path, colormode='color')
+
+                # Show a success message
+                messagebox.showinfo("Success", "Drawn note saved successfully!")
+
+                # Get name of file path without the directory path or extension
+                file_name = os.path.splitext(os.path.basename(file_path))[0]
+                # Set the window title to the file name
+                self.controller.title(file_name + " - Note-Taker App")
+                
+                return file_path
+            except Exception as e:
+                # Show an error message if there's any issue with saving
+                tk.messagebox.showerror("Error", f"An error occurred while saving the drawn note: {e}")
+    
+    # Load Drawn Note Function
+    # Description: Opens a file dialog for the user to select the load location. They can select a . file to load.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The file path is returned if a file is selected.
+    def load_drawn_note(self):
+        # Open a file dialog for the user to select the load location
+        file_path = filedialog.askopenfilename(defaultextension=".png", filetypes=[("PNG", "*.png")], title="Load File")
+        # If a file path is selected
+        if file_path:
+            try:
+                # Show a success message
+                messagebox.showinfo("Success", "Drawn note successfully opened!")
+
+                # Open the image using PIL
+                image = Image.open(file_path)
+
+                # Display the image on the canvas
+                self.display_image(image)
+
+                # Get name of file path without the directory path or extension
+                file_name = os.path.splitext(os.path.basename(file_path))[0]
+                # Set the window title to the file name
+                self.controller.title(file_name + " - Note-Taker App")
+
+                return file_path
+            except Exception as e:
+                # Show an error message if there's any issue with opening
+                messagebox.showerror("Error", f"An error occurred while opening the drawn note: {e}")
+
+    # Display Image Function
+    # Description:
+    # Preconditions:
+    # Postconditions: 
+    def display_image(self, image):
+        # Convert the PIL image to a format that Tkinter can handle directly
+        photo = ImageTk.PhotoImage(image)
+        # Create or update the canvas to display the image
+        if self.canvas is None:
+            self.canvas = tk.Canvas(self, width=image.width, height=image.height)
+            self.canvas.pack()  # Adjust the placement as needed
+        else:
+            self.canvas.delete("all")
+        # Display the image on the canvas
+        self.canvas.create_image(0, 0, anchor=tk.NW, image=photo)
+        # Save a reference to the PhotoImage to prevent garbage collection
+        self.canvas.image = photo
 
 # Driver Code
 app = noteTaker()
