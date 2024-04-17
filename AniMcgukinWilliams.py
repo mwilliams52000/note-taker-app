@@ -11,6 +11,7 @@ from spellchecker import SpellChecker
 import threading
 import pickle
 import pyaudio
+import os
 import wave
 from tkinter import ttk, Listbox, Scrollbar, Menu
 import speech_recognition as sr
@@ -25,7 +26,7 @@ LARGEFONT =("Verdana", 25)
 class noteTaker(tk.Tk):
     # Initialization Function
     # Description: Initializes the noteTaker class and creates a container for the frames.
-    # Preconditions: None
+    # Preconditions: Self and arguments must be passed as parameters.
     # Postconditions: None
     def __init__(self, *args, **kwargs):
         # __init__ function for class Tk
@@ -153,8 +154,9 @@ class LandingPage(tk.Frame):
 
         # Create file menu
         file_menu = tk.Menu(menu_bar, tearoff=0)
-        file_menu.add_command(label="Open")
-        file_menu.add_command(label="Save", command=self.controller.frames[TypedNotePage].export_typed_note)
+        file_menu.add_command(label="Open", command = lambda: self.controller.frames[TypedNotePage].load_note_driver())
+        file_menu.add_command(label="Save", command = lambda: self.controller.frames[TypedNotePage].save_note_driver())
+        file_menu.add_command(label="Export", command=self.controller.frames[TypedNotePage].export_typed_note)
         file_menu.add_separator()
     
         # Source: https://www.geeksforgeeks.org/how-to-close-a-window-in-tkinter/
@@ -163,27 +165,27 @@ class LandingPage(tk.Frame):
 
         # Create Edit menu
         edit_menu = tk.Menu(menu_bar, tearoff=0)
-        edit_menu.add_command(label="Undo")
-        edit_menu.add_command(label="Redo")
+        edit_menu.add_command(label="Undo", command=self.controller.frames[TypedNotePage].typed_note_undo)
+        edit_menu.add_command(label="Redo", command=self.controller.frames[TypedNotePage].typed_note_redo)
         edit_menu.add_separator()
         edit_menu.add_command(label="Underline Text", command=self.controller.frames[TypedNotePage].underline_text)
         edit_menu.add_command(label="Remove Underline", command=self.controller.frames[TypedNotePage].remove_underline_text)
         edit_menu.add_command(label="Add Bullet Point", command=self.controller.frames[TypedNotePage].add_bullet_point)
         edit_menu.add_separator()
-        edit_menu.add_command(label="Cut")
-        edit_menu.add_command(label="Copy")
-        edit_menu.add_command(label="Paste")
+        edit_menu.add_command(label="Cut", command=self.controller.frames[TypedNotePage].typed_note_cut)
+        edit_menu.add_command(label="Copy", command=self.controller.frames[TypedNotePage].typed_note_copy)
+        edit_menu.add_command(label="Paste", command=self.controller.frames[TypedNotePage].typed_note_paste)
         menu_bar.add_cascade(label="Edit", menu=edit_menu)
 
         # Create color menu
         color_menu = tk.Menu(menu_bar, tearoff=0)
-        color_menu.add_command(label="Default")
-        color_menu.add_command(label="Red")
-        color_menu.add_command(label="Blue")
-        color_menu.add_command(label="Green")
-        color_menu.add_command(label="Yellow")
-        color_menu.add_command(label="Purple")
-        color_menu.add_command(label="White")
+        color_menu.add_command(label="Default", command=lambda: self.controller.frames[TypedNotePage].change_color("black"))
+        color_menu.add_command(label="Red", command=lambda: self.controller.frames[TypedNotePage].change_color("red"))
+        color_menu.add_command(label="Blue", command=lambda: self.controller.frames[TypedNotePage].change_color("blue"))
+        color_menu.add_command(label="Green", command=lambda: self.controller.frames[TypedNotePage].change_color("green"))
+        color_menu.add_command(label="Yellow", command=lambda: self.controller.frames[TypedNotePage].change_color("yellow"))
+        color_menu.add_command(label="Purple", command=lambda: self.controller.frames[TypedNotePage].change_color("purple"))
+        color_menu.add_command(label="Pink", command=lambda: self.controller.frames[TypedNotePage].change_color("pink"))
         menu_bar.add_cascade(label="Color", menu=color_menu)
 
         # Create transcribe speech menu
@@ -219,7 +221,7 @@ class LandingPage(tk.Frame):
         color_menu.add_command(label="Green", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("green"))
         color_menu.add_command(label="Yellow", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("yellow"))
         color_menu.add_command(label="Purple", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("purple"))
-        color_menu.add_command(label="White", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("white"))
+        color_menu.add_command(label="Pink", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("pink"))
 
         menu_bar.add_cascade(label="Color", menu=color_menu)
 
@@ -233,13 +235,13 @@ class TypedNotePage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.windowNum = 0
+        self.controller = controller
 
         # Create word lists for TypedNotePage class
         self.wordsList = []
-        self.mispelledWords = False
 
         # Create text area to type notes
-        self.text_area = tk.Text(self)
+        self.text_area = tk.Text(self, undo=True)
         self.text_area.pack(expand=True, fill='both')
 
         # Bind keyboard actions to buttons
@@ -248,7 +250,7 @@ class TypedNotePage(tk.Frame):
 
         # When the user types into the keybaord, check if the previous character is underlined
         # If it is, underline this current character as well
-        self.text_area.bind("<Key>", lambda event: self.is_prev_char_underlined())
+        self.text_area.bind("<Key>", lambda event: self.key_control())
 
         # When the user types into the keyboard, manage the strings in the text area
         self.text_area.bind("<KeyRelease>", lambda event: self.manage_text_area_strings())
@@ -263,29 +265,6 @@ class TypedNotePage(tk.Frame):
 
         # When the user types space or enter, add visible spelling errors
         self.text_area.bind("<space>", lambda event: self.space_control())
-
-    # Export Typed Note Function
-    # Description: Allows the user to export the typed note to a .txt file
-    # Preconditions: Self must be passed as a parameter
-    # Postconditions: The typed note is exported to a .txt file
-    def export_typed_note(self):
-
-        typed_note_content = self.text_area.get("1.0", tk.END)
-
-        # Open a file dialog for the user to select the save location
-        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt")])
-
-        # If a file path is selected
-        if file_path:
-            try:
-                # Write the typed note content to the selected file
-                with open(file_path, "w") as file:
-                    file.write(typed_note_content)
-                # Show a success message
-                tk.messagebox.showinfo("Success", "Typed note exported successfully!")
-            except Exception as e:
-                # Show an error message if there's any issue with exporting
-                tk.messagebox.showerror("Error", f"An error occurred while exporting the typed note: {e}")
 
     # Key Release Return Control Function
     # Description: Checks if the previous line is bulleted and identifies misspelled words by calling related functions.
@@ -304,12 +283,22 @@ class TypedNotePage(tk.Frame):
         self.identify_misspelled_words()
     
     # Space Control Function
-    # Description: Identifies misspelled words and checks if the previous character is underlined by calling related functions.
+    # Description: Identifies misspelled words and checks if the previous character is underlined or colored 
+    # by calling related functions.
     # Preconditions: Self must be passed as a parameter.
-    # Postconditions: Misspelled words are identified and the current character is underlined if needed.
+    # Postconditions: Misspelled words are identified and the current character is underlined or colored if needed.
     def space_control(self):
         self.identify_misspelled_words()
         self.is_prev_char_underlined()
+        self.is_prev_char_colored()
+    
+    # Key Control Function
+    # Description: Checks if the previous character is underlined or colored by calling related functions.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The current character is underlined or colored if needed.
+    def key_control(self):
+        self.is_prev_char_underlined()
+        self.is_prev_char_colored()
 
     # Underline Text Function
     # Description: Underlines the selected text in the text area.
@@ -327,6 +316,28 @@ class TypedNotePage(tk.Frame):
             self.text_area.tag_add("underline", current_selection[0], current_selection[1])
             self.text_area.tag_configure("underline", underline=True)
     
+    # Change Color Function
+    # Description: This function changes the color of the highlighted text to the new passed in one.
+    # Preconditions: Self and the color string must be passed as parameters.
+    # Postconditions: The color of the text is changed.
+    def change_color(self, color):
+        # Get the current selection
+        current_selection = self.text_area.tag_ranges(tk.SEL)
+    
+        # List of supported colors
+        colors = ["red", "blue", "green", "yellow", "purple", "pink", "black"]
+    
+        # For every color in the list of colors, remove the tag if it is present
+        for col in colors:
+            if current_selection:
+                if col in self.text_area.tag_names(current_selection[0]):
+                    self.text_area.tag_remove(col, current_selection[0], current_selection[1])
+    
+        # If there is a selection, add the color
+        if current_selection:
+            self.text_area.tag_add(color, current_selection[0], current_selection[1])
+            self.text_area.tag_config(color, foreground = color)
+
     # Remove Underline Text Function
     # Description: Removes the underline from the selected text in the text area.
     # Preconditions:
@@ -387,6 +398,46 @@ class TypedNotePage(tk.Frame):
             self.text_area.tag_add("underline", current_index)
             self.text_area.tag_configure("underline", underline=True)
     
+    # Is Previous Character Colored
+    # Description: Checks if the previous character is colored If it is, color the current character.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The current character is colored if the previous character is colored.
+    def is_prev_char_colored(self):
+        # Get the current index of the typing cursor
+        current_index = self.text_area.index(tk.INSERT)
+        # Get the index of the previous character
+        prev_char_index = "{}.{}".format(current_index.split('.')[0], int(current_index.split('.')[1]) - 1)
+
+        # Check if the previous character has the color tag
+        if "red" in self.text_area.tag_names(prev_char_index):
+            # If it is, color the current character as well
+            self.text_area.tag_add("red", current_index)
+            self.text_area.tag_configure("red", foreground = "red")
+        elif "blue" in self.text_area.tag_names(prev_char_index):
+            # If it is, color the current character as well
+            self.text_area.tag_add("blue", current_index)
+            self.text_area.tag_configure("blue", foreground = "blue")
+        elif "green" in self.text_area.tag_names(prev_char_index):
+            # If it is, color the current character as well
+            self.text_area.tag_add("green", current_index)
+            self.text_area.tag_configure("green", foreground = "green")
+        elif "yellow" in self.text_area.tag_names(prev_char_index):
+            # If it is, color the current character as well
+            self.text_area.tag_add("yellow", current_index)
+            self.text_area.tag_configure("yellow", foreground = "yellow")
+        elif "purple" in self.text_area.tag_names(prev_char_index):
+            # If it is, color the current character as well
+            self.text_area.tag_add("purple", current_index)
+            self.text_area.tag_configure("purple", foreground = "purple")
+        elif "pink" in self.text_area.tag_names(prev_char_index):
+            # If it is, color the current character as well
+            self.text_area.tag_add("pink", current_index)
+            self.text_area.tag_configure("pink", foreground = "pink")
+        else:
+            # Use default color
+            self.text_area.tag_add("black", current_index)
+            self.text_area.tag_configure("black", foreground = "black")
+    
     # Manage Text Area Strings
     # Description: Adds and removes strings into the class's list of words.
     # Precondition: Self must be passed as a parameter.
@@ -419,6 +470,8 @@ class TypedNotePage(tk.Frame):
     # Preconditions: Class self must be passed as a parameter.
     # Postconditions: Unknown words are identified and tagged in text area.
     def identify_misspelled_words(self):
+        # Update wordsList
+        self.manage_text_area_strings()
         # Get SpellChecker object
         spell = SpellChecker()
         # From the class's word list, find words not in dictionary
@@ -489,6 +542,11 @@ class TypedNotePage(tk.Frame):
             # Add blank message label field
             self.message_label = tk.Label(self.audio_window, text="")
             self.message_label.pack()
+
+            # Add an "Undo button" to undo the last action
+            undo_button = tk.Button(self.audio_window, text="Undo Addition", command=self.typed_note_undo)
+            undo_button.pack()
+
             # Increment count of windows
             self.windowNum = self.windowNum + 1
 
@@ -567,38 +625,337 @@ class TypedNotePage(tk.Frame):
         sound_file.setframerate(44100)
         sound_file.writeframes(b"".join(frames))
         sound_file.close()
+        
+        audio = self.open_audio_file()
+        # If the audio file was found and opened successfully, transcribe the speech
+        if (not(audio == False)):
+            text = self.transcribe_speech(audio)
+            # If the text was successfully transcribed, insert it into the text area and delete the audio file
+            if (not(text == False)):
+                self.text_area.insert(tk.END, text)
+                self.delete_audio_file()
     
     # Transcribe Speech Function
+    # Source: https://github.com/Uberi/speech_recognition/blob/master/examples/microphone_recognition.py
     # Description:
     # Preconditions:
     # Postconditions:
-    def transcribe_speech(self):
-        # obtain audio from the microphone
+    def transcribe_speech(self, audio):
         r = sr.Recognizer()
-        with sr.Microphone() as source:
-            print("Say something!")
-            audio = r.listen(source)
-
-        # recognize speech using whisper
+        # recognize speech using Google Speech Recognition
         try:
-            print("Whisper thinks you said " + r.recognize_whisper(audio, language="english"))
+            message = r.recognize_google(audio, language="english")
+            # Debug message
+            print("Google thinks you said '" + message + "'.")
+            return message
         except sr.UnknownValueError:
-            print("Whisper could not understand audio")
+            # Debug message
+            print("Google could not understand audio")
+            return False
         except sr.RequestError as e:
-            print(f"Could not request results from Whisper; {e}")
+            # Debug message
+            print(f"Could not request results from Google; {e}")
+            return False
+    
+    # Open Audio File Function
+    # Description: Opens the audio file.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The audio file is opened and returned if it can be opened. Else, False is returned.
     def open_audio_file(self):  
         try:
             with wave.open("Audio.wav", "rb") as audio_file:
-                audio_data = audio_file.readframes(audio_file.getnframes())
-                print("Audio file opened successfully")
+                # Convert raw data to AudioData
+                audio_data = sr.AudioData(audio_file.readframes(audio_file.getnframes()), audio_file.getframerate(), audio_file.getsampwidth())
+                return audio_data
         except FileNotFoundError:
-            print("Error: Audio file not found")        
+            # Debug message
+            print("Error: Audio file not found")  
+            return False
+    
+    # Delete Audio File Function
+    # Description: Deletes the audio file.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The audio file is deleted.
+    def delete_audio_file(self):
+        try:
+            os.remove("Audio.wav")
+        except FileNotFoundError:
+            # Debug message
+            print("Error: Audio file not found")
+    
+    # Export Typed Note Function
+    # Source: https://tkdocs.com/shipman/tkFileDialog.html
+    # Description: Allows the user to export the typed note to a .txt file
+    # Preconditions: Self must be passed as a parameter
+    # Postconditions: The typed note is exported to a .txt file
+    def export_typed_note(self):
+
+        typed_note_content = self.text_area.get("1.0", tk.END)
+
+        # Open a file dialog for the user to select the save location
+        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt")], title="Export as")
+
+        # If a file path is selected
+        if file_path:
+            try:
+                # Write the typed note content to the selected file
+                with open(file_path, "w") as file:
+                    file.write(typed_note_content)
+                # Show a success message
+                tk.messagebox.showinfo("Success", "Typed note exported successfully!")
+            except Exception as e:
+                # Show an error message if there's any issue with exporting
+                tk.messagebox.showerror("Error", f"An error occurred while exporting the typed note: {e}")
+    
+    # Save Typed Note Function
+    # Description: Opens a file dialog for the user to select the save location. They can select a .typ file to save.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The file path is returned if a file is selected.
+    def save_typed_note(self):
+        # Open a file dialog for the user to select the save location
+        file_path = filedialog.asksaveasfilename(defaultextension=".typ", filetypes=[("Typed Note Files", "*.typ")], title="Save as")
+        # If a file path is selected
+        if file_path:
+            try:
+                # Show a success message
+                tk.messagebox.showinfo("Success", "Typed note saved successfully!")
+                # Get name of file path without the directory path or extension
+                file_name = os.path.splitext(os.path.basename(file_path))[0]
+                # Set the window title to the file name
+                self.controller.title(file_name + " - Note-Taker App")
+                return file_path
+            except Exception as e:
+                # Show an error message if there's any issue with saving
+                tk.messagebox.showerror("Error", f"An error occurred while saving the typed note: {e}")
+    
+    # Load Typed Note Function
+    # Description: Opens a file dialog for the user to select the load location. They can select a .typ file to load.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The file path is returned if a file is selected.
+    def load_typed_note(self):
+        # Open a file dialog for the user to select the load location
+        file_path = filedialog.askopenfilename(defaultextension=".typ", filetypes=[("Typed Note Files", "*.typ")], title="Load File")
+        # If a file path is selected
+        if file_path:
+            try:
+                # Show a success message
+                tk.messagebox.showinfo("Success", "Typed note successfully opened!")
+                # Get name of file path without the directory path or extension
+                file_name = os.path.splitext(os.path.basename(file_path))[0]
+                # Set the window title to the file name
+                self.controller.title(file_name + " - Note-Taker App")
+                return file_path
+            except Exception as e:
+                # Show an error message if there's any issue with opening
+                tk.messagebox.showerror("Error", f"An error occurred while opening the typed note: {e}")
+
+    # Create Pickle File Function
+    # Description: Creates a pickle file with the typed note content and the underlined/color sequences.
+    # Preconditions: Self and the file name must be passed as parameters.
+    # Postconditions: A pickle file is created with the typed note content and the underlined/color sequences saved as a string and tuples.
+    def create_pickle_file(self, file_name):
+        # Open file for binary writing
+        data_file = open(file_name, 'wb')
+        # Get note content
+        typed_note_content = self.text_area.get("1.0", tk.END)
+        # Add typed note content to pickle file
+        pickle.dump(typed_note_content, data_file)
+        # Get index of every underlined sequence and put into a tuple
+        underline_ranges = tuple(str(index) for index in self.text_area.tag_ranges("underline"))
+        # Add underlined sequences to pickle file
+        pickle.dump(underline_ranges, data_file)
+        # Repeat the process for other colors
+        red_ranges = tuple(str(index) for index in self.text_area.tag_ranges("red"))
+        pickle.dump(red_ranges, data_file)
+        blue_ranges = tuple(str(index) for index in self.text_area.tag_ranges("blue"))
+        pickle.dump(blue_ranges, data_file)
+        green_ranges = tuple(str(index) for index in self.text_area.tag_ranges("green"))
+        pickle.dump(green_ranges, data_file)
+        yellow_ranges = tuple(str(index) for index in self.text_area.tag_ranges("yellow"))
+        pickle.dump(yellow_ranges, data_file)
+        purple_ranges = tuple(str(index) for index in self.text_area.tag_ranges("purple"))
+        pickle.dump(purple_ranges, data_file)
+        pink_ranges = tuple(str(index) for index in self.text_area.tag_ranges("pink"))
+        pickle.dump(pink_ranges, data_file)
+        # Close file
+        data_file.close()
+    
+    # Open Pickle File Function
+    # Description: Loads information from a pickle file. It inserts the typed note content into the text area and then adds the underlined/color sequences back to the text area.
+    # Preconditions: Self and the file name must be passed as parameters.
+    # Postconditions: The typed note content is updated to be the content of the pickle file.
+    def open_pickle_file(self, file_name):
+        try:
+            # Open file for binary reading
+            data_file = open(file_name, 'rb')
+            # Load typed note content
+            typed_note_content = pickle.load(data_file)
+            # Load underlined sequences
+            underline_ranges = pickle.load(data_file)
+            # Load color sequences
+            red_ranges = pickle.load(data_file)
+            blue_ranges = pickle.load(data_file)
+            green_ranges = pickle.load(data_file)
+            yellow_ranges = pickle.load(data_file)
+            purple_ranges = pickle.load(data_file)
+            pink_ranges = pickle.load(data_file)
+            # Close file
+            data_file.close()
+            # Wipe text area clean
+            self.text_area.delete("1.0", tk.END)
+            # Insert typed note content into text area
+            self.text_area.insert(tk.END, typed_note_content)
+            # Add underlined sequences back to text area
+            i = 0
+            # Add underlined sequences back to text area
+            while(i < len(underline_ranges) - 1):
+                # As the tuple consists of start and end pairs, add the tag to the text area
+                # in pairs of two, then increment i counter by 2
+                self.text_area.tag_add("underline", underline_ranges[i], underline_ranges[i+1])
+                self.text_area.tag_configure("underline", underline=True)
+                i += 2
+            # Add red sequences back to text area
+            i = 0
+            while(i < len(red_ranges) - 1):
+                # As the tuple consists of start and end pairs, add the tag to the text area
+                # in pairs of two, then increment i counter by 2
+                self.text_area.tag_add("red", red_ranges[i], red_ranges[i+1])
+                self.text_area.tag_configure("red", foreground = "red")
+                i += 2
+            # Add blue sequences back to text area
+            i = 0
+            while(i < len(blue_ranges) - 1):
+                # As the tuple consists of start and end pairs, add the tag to the text area
+                # in pairs of two, then increment i counter by 2
+                self.text_area.tag_add("blue", blue_ranges[i], blue_ranges[i+1])
+                self.text_area.tag_configure("blue", foreground = "blue")
+                i += 2
+            # Add green sequences back to text area
+            i = 0
+            while(i < len(green_ranges) - 1):
+                # As the tuple consists of start and end pairs, add the tag to the text area
+                # in pairs of two, then increment i counter by 2
+                self.text_area.tag_add("green", green_ranges[i], green_ranges[i+1])
+                self.text_area.tag_configure("green", foreground = "green")
+                i += 2
+            # Add yellow sequences back to text area
+            i = 0
+            while(i < len(yellow_ranges) - 1):
+                # As the tuple consists of start and end pairs, add the tag to the text area
+                # in pairs of two, then increment i counter by 2
+                self.text_area.tag_add("yellow", yellow_ranges[i], yellow_ranges[i+1])
+                self.text_area.tag_configure("yellow", foreground = "yellow")
+                i += 2
+            # Add purple sequences back to text area
+            i = 0
+            while(i < len(purple_ranges) - 1):
+                # As the tuple consists of start and end pairs, add the tag to the text area
+                # in pairs of two, then increment i counter by 2
+                self.text_area.tag_add("purple", purple_ranges[i], purple_ranges[i+1])
+                self.text_area.tag_configure("purple", foreground = "purple")
+                i += 2
+            # Add pink sequences back to text area
+            i = 0
+            while(i < len(pink_ranges) - 1):
+                # As the tuple consists of start and end pairs, add the tag to the text area
+                # in pairs of two, then increment i counter by 2
+                self.text_area.tag_add("pink", pink_ranges[i], pink_ranges[i+1])
+                self.text_area.tag_configure("pink", foreground = "pink")
+                i += 2
+        except:
+            return
+    
+    # Typed Note Paste Function
+    # Partially adapted from this source: https://stackoverflow.com/questions/73059188/copying-and-pasting-text-displayed-on-tkinter-text-widget:
+    # Description: This function pastes the copied text into the text area.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The copied text is pasted into the text area.
+    def typed_note_paste(self):
+        # If there is an item in the clipboard, paste it into the text area
+        try:
+            self.text_area.insert('end', self.selection_get(selection='CLIPBOARD'))
+        except:
+            return
+    
+    # Typed Note Copy Function
+    # Partially adapted from this source: https://stackoverflow.com/questions/73059188/copying-and-pasting-text-displayed-on-tkinter-text-widget:
+    # Description: This function copies the selected text in the text area.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The selected text is copied.
+    def typed_note_copy(self):
+        # If there is a selection, copy it to clipboard
+        try:
+            content = self.selection_get()
+            self.clipboard_clear()
+            self.clipboard_append(content)  
+        except:
+            return
+    
+    # Typed Note Cut Function
+    # Partially adapted from this source: https://stackoverflow.com/questions/73059188/copying-and-pasting-text-displayed-on-tkinter-text-widget:
+    # Description: This function cuts the selected text in the text area.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The selected text is cut.
+    def typed_note_cut(self):
+        # If there is a selection, cut it from the text area
+        try:
+            content = self.selection_get()
+            self.clipboard_clear()
+            self.clipboard_append(content)
+            self.text_area.delete('sel.first', 'sel.last')
+        except:
+            return
+    
+    # Typed Note Undo Function
+    # Source: https://tkdocs.com/tutorial/text.html
+    # See section "Modifications, Undo and Redo"
+    # Description: This function undoes the last action in the text area.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The last action is undone.
+    def typed_note_undo(self):
+        try:
+            self.text_area.edit_undo()
+        except:
+            return
+    
+    # Typed Note Redo Function
+    # Source: https://tkdocs.com/tutorial/text.html
+    # See section "Modifications, Undo and Redo"
+    # Description: This function redoes the last action in the text area.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The last action is redone.
+    def typed_note_redo(self):
+        try:
+            self.text_area.edit_redo()
+        except:
+            return
+    
+    # Save Note Driver Function
+    # Description: This function is the driver for saving a typed note.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The typed note is saved.
+    def save_note_driver(self):
+        # Launch window for user to save a typed note
+        # Set "saved_file" to file location
+        saved_file = self.save_typed_note()
+        # Create a pickle file and save it to file location
+        self.create_pickle_file(saved_file)
+    
+    # Load Note Driver Function
+    # Description: This function is the driver for loading a typed note.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The typed note is loaded.
+    def load_note_driver(self):
+        # Launch window for user to load a typed note
+        opened_file = self.load_typed_note()
+        # Open a pickle file and load it
+        self.open_pickle_file(opened_file)
 
 class DrawnNotePage(tk.Frame):
     # Initialization Function
     # Description: Initializes the DrawnNotePage class
-    # Preconditions: None
-    # Postconditions: None
+    # Preconditions: 
+    # Postconditions: 
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.controller = controller
@@ -615,24 +972,6 @@ class DrawnNotePage(tk.Frame):
         self.canvas.bind("<B1-Motion>", self.add_line)
 
         self.lastx, self.lasty = None, None
-
-    # Export Drawn Note Function
-    # Description: Allows the user to export the drawn note to a .png file.
-    # Preconditions: Self must be passed as a parameter.
-    # Postconditions: The drawn note is exported to a .png file.
-    def export_drawn_note(self):
-        # Create a file dialog for the user to select the save location
-        file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Files", "*.png")])
-
-        if file_path:  # If user selected a file path
-            try:
-                # Create an image (screenshot) of the canvas and save it as a PNG file
-                self.canvas.postscript(file=file_path, colormode='color')
-                
-                tk.messagebox.showinfo("Success", "Typed note exported successfully!")
-                
-            except Exception as e:
-                tk.messagebox.showerror("Error", f"An error occurred while exporting the drawn note: {e}")
 
     # Save Position Function
     # Description:
@@ -657,6 +996,23 @@ class DrawnNotePage(tk.Frame):
     def set_line_color(self, line_color):
         self.color = line_color
 
+    # Export Drawn Note Function
+    # Description: Allows the user to export the drawn note to a .png file.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The drawn note is exported to a .png file.
+    def export_drawn_note(self):
+        # Create a file dialog for the user to select the save location
+        file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Files", "*.png")])
+
+        if file_path:  # If user selected a file path
+            try:
+                # Create an image (screenshot) of the canvas and save it as a PNG file
+                self.canvas.postscript(file=file_path, colormode='color', title = "Save as")
+
+                tk.messagebox.showinfo("Success", "Typed note exported successfully!")
+
+            except Exception as e:
+                tk.messagebox.showerror("Error", f"An error occurred while exporting the drawn note: {e}")
 
 # Driver Code
 app = noteTaker()
