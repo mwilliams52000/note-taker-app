@@ -43,7 +43,6 @@ class noteTaker(tk.Tk):
         # Initialize frames to an empty array
         self.frames = {}  
 
-
         # Iterate through a tuple consiting of the classes of the pages
         for F in (LandingPage, TypedNotePage, DrawnNotePage):
             frame = F(container, self)
@@ -72,6 +71,9 @@ class LandingPage(tk.Frame):
         self.controller = controller
         self.grid(sticky=tk.N+tk.S+tk.E+tk.W)
 
+        # Get a list of all the notes in the current directory
+        notes_list = self.get_drawn_and_typed_notes_list()
+
         # Set size of window
         # Source: https://tkdocs.com/shipman/toplevel.html
         controller.geometry("350x300")
@@ -97,7 +99,7 @@ class LandingPage(tk.Frame):
         buttons = [
             ("New Typed Note", lambda: self.new_typed_note_navigate(controller)),
             ("New Drawn Note", lambda: self.new_drawn_note_navigate(controller)),
-            ("Load Note", None)
+            ("Load Note", lambda: self.load_note_navigate(controller))
         ]
 
         # Create and place buttons into the button frame using a loop
@@ -107,13 +109,18 @@ class LandingPage(tk.Frame):
             button = ttk.Button(button_frame, text=text, command=command)
             button.pack(padx=10, pady=5)
 
-        # Create a listbox and scrollbar for recently opened notes
+        # Create a listbox and scrollbar for notes in directory
+        # Bind to and "on_select" function to handle selection of notes
         # Source: https://tkdocs.com/tutorial/morewidgets.html
         scrollbar = Scrollbar(self)
         scrollbar.grid(row=0, column=1, rowspan=4, sticky='ns')
         listbox = Listbox(self, yscrollcommand=scrollbar.set)
+        # Insert each note into the listbox
+        for note in notes_list:
+            listbox.insert(tk.END, note)
         listbox.grid(row=0, column=2, rowspan=4, sticky='nsew')
         scrollbar.config(command=listbox.yview)
+        listbox.bind('<<ListboxSelect>>', self.on_select)
 
         # Configure the rows and columns to expand proportionally when the window is resized
         # Source: https://tkdocs.com/shipman/root-resize.html
@@ -135,9 +142,9 @@ class LandingPage(tk.Frame):
         controller.config(menu=menu_bar)
     
     # New Drawn Note Navigate Function
-    # Description:
-    # Preconditions:
-    # Postconditions
+    # Description: Changes the window title and switches to the DrawnNotePage frame.
+    # Preconditions: The controller must be passed as a parameter.
+    # Postconditions The DrawnNotePage frame is displayed.
     def new_drawn_note_navigate(self, controller):
         controller.title("untitled - Note-Taker App")
         controller.show_frame(DrawnNotePage)
@@ -145,6 +152,120 @@ class LandingPage(tk.Frame):
         # Configure the typed note page to use the menu bar
         controller.config(menu=menu_bar)
     
+    # Load Note Navigate Function
+    # Description: Opens a file dialog to select a file path. Then, loads the note based on the file path.
+    # Preconditions: The controller must be passed as a parameter.
+    # Postconditions: The note is loaded depending on the file path.
+    def load_note_navigate(self, controller):
+        file_path = self.get_file_path()
+        # Determine if file extension is .typ, .dra, or something else
+        if file_path.endswith(".typ"):
+            # Get name of file path without the directory path or extension
+            file_name = os.path.splitext(os.path.basename(file_path))[0]
+            # Set the window title to the file name
+            controller.title(file_name + " - Note-Taker App")
+            # Change frame
+            controller.show_frame(TypedNotePage)
+            menu_bar = self.buildTypedNoteMenu()
+            # Configure the typed note page to use the menu bar
+            controller.config(menu=menu_bar)
+            # Open the pickle file and update text area
+            controller.frames[TypedNotePage].open_pickle_file(file_path)
+            # Show a success message
+            tk.messagebox.showinfo("Success", "Typed note successfully opened!")
+        elif file_path.endswith(".dra"):
+            # Get name of file path without the directory path or extension
+            file_name = os.path.splitext(os.path.basename(file_path))[0]
+            # Set the window title to the file name
+            controller.title(file_name + " - Note-Taker App")
+        else:
+            # Show an error message if there's any issue with opening
+            tk.messagebox.showerror("Error", f"Not a valid file type: {file_path}")
+
+    # Get File Path Function
+    # Description: Opens a file dialog to select a file path.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The file path is returned.
+    def get_file_path(self):
+        file_path = filedialog.askopenfilename(defaultextension=".typ", filetypes=[("Typed Note Files", "*.typ"), ("Drawn Note Files", "*.dra")], title="Load File")
+        # If a file path is selected
+        if file_path:
+            try:
+                return file_path
+            except Exception as e:
+                # Show an error message if there's any issue with opening
+                tk.messagebox.showerror("Error", f"An error occurred while opening the note: {e}")
+        return file_path
+
+    # Get Drawn and Typed Notes List Function
+    # Description: Returns a list of the drawn and typed notes within the local directory and notes folder.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The list of notes is returned.
+    def get_drawn_and_typed_notes_list(self):
+        # If there is not a folder called "notes" in the current directory, create one
+        if not os.path.exists("notes"):
+            os.mkdir("notes")
+        # Get all files in the current directory
+        files = os.listdir()
+        # Initialize lists for typed and drawn notes
+        notes_list = []
+        # Iterate through all files in the directory
+        for file in files:
+            # If the file is a typed or drawn note, add to the typed notes list
+            if (file.endswith(".typ") or file.endswith(".dra")):
+                notes_list.append(file)
+        # Ensure that the folder called "notes" is in the current directory
+        if os.path.exists("notes"):
+            # Get all files in the "notes" directory
+            notes_files = os.listdir("notes")
+            # Iterate through all files in the "notes" directory
+            for file in notes_files:
+                # If the file is a typed or drawn note, add to the typed notes list
+                if (file.endswith(".typ") or file.endswith(".dra")):
+                    notes_list.append("notes/" + file)
+        return notes_list
+
+    # Note Listbox Function
+    # Description: Gets the selection an entry in listbox and opens it.
+    # Preconditions: Self , controller, and file_path must be passed as a parameter.
+    # Postconditions: The selected note is opened and loaded.
+    def note_listbox(self, controller, file_path):
+        # Determine if file extension is .typ, .dra, or something else
+        if file_path.endswith(".typ"):
+            # Get name of file path without the directory path or extension
+            file_name = os.path.splitext(os.path.basename(file_path))[0]
+            # Set the window title to the file name
+            controller.title(file_name + " - Note-Taker App")
+            # Change frame
+            controller.show_frame(TypedNotePage)
+            menu_bar = self.buildTypedNoteMenu()
+            # Configure the typed note page to use the menu bar
+            controller.config(menu=menu_bar)
+            # Open the pickle file and update text area
+            controller.frames[TypedNotePage].open_pickle_file(file_path)
+            # Show a success message
+            tk.messagebox.showinfo("Success", "Typed note successfully opened!")
+        elif file_path.endswith(".dra"):
+            # Get name of file path without the directory path or extension
+            file_name = os.path.splitext(os.path.basename(file_path))[0]
+            # Set the window title to the file name
+            controller.title(file_name + " - Note-Taker App")
+        else:
+            # Show an error message if there's any issue with opening
+            tk.messagebox.showerror("Error", f"Not a valid file type: {file_path}")
+    
+    # On Select Function
+    # Description: Controls the selection of entries in listbox.
+    # Preconditions: Self and the selection event must be passed as a parameter.
+    # Postconditions: The selected note is loaded.
+    def on_select(self, event):
+        # Use event.widget to refer to the listbox selection
+        selected_note = event.widget.get(event.widget.curselection())
+        # Get the controller from class
+        controller = self.controller
+        # Load the selected note from the listbox
+        self.note_listbox(controller, selected_note) 
+            
     # Build Typed Note Menu Function
     # Description:
     # Preconditions:
@@ -714,8 +835,12 @@ class TypedNotePage(tk.Frame):
     # Preconditions: Self must be passed as a parameter.
     # Postconditions: The file path is returned if a file is selected.
     def save_typed_note(self):
+        default_path = None
+        # Set default path to notes folder if it exists
+        if os.path.isdir("notes"):
+            default_path = "notes"
         # Open a file dialog for the user to select the save location
-        file_path = filedialog.asksaveasfilename(defaultextension=".typ", filetypes=[("Typed Note Files", "*.typ")], title="Save as")
+        file_path = filedialog.asksaveasfilename(defaultextension=".typ", filetypes=[("Typed Note Files", "*.typ")], title="Save as", initialdir=default_path)
         # If a file path is selected
         if file_path:
             try:
@@ -756,31 +881,34 @@ class TypedNotePage(tk.Frame):
     # Preconditions: Self and the file name must be passed as parameters.
     # Postconditions: A pickle file is created with the typed note content and the underlined/color sequences saved as a string and tuples.
     def create_pickle_file(self, file_name):
-        # Open file for binary writing
-        data_file = open(file_name, 'wb')
-        # Get note content
-        typed_note_content = self.text_area.get("1.0", tk.END)
-        # Add typed note content to pickle file
-        pickle.dump(typed_note_content, data_file)
-        # Get index of every underlined sequence and put into a tuple
-        underline_ranges = tuple(str(index) for index in self.text_area.tag_ranges("underline"))
-        # Add underlined sequences to pickle file
-        pickle.dump(underline_ranges, data_file)
-        # Repeat the process for other colors
-        red_ranges = tuple(str(index) for index in self.text_area.tag_ranges("red"))
-        pickle.dump(red_ranges, data_file)
-        blue_ranges = tuple(str(index) for index in self.text_area.tag_ranges("blue"))
-        pickle.dump(blue_ranges, data_file)
-        green_ranges = tuple(str(index) for index in self.text_area.tag_ranges("green"))
-        pickle.dump(green_ranges, data_file)
-        yellow_ranges = tuple(str(index) for index in self.text_area.tag_ranges("yellow"))
-        pickle.dump(yellow_ranges, data_file)
-        purple_ranges = tuple(str(index) for index in self.text_area.tag_ranges("purple"))
-        pickle.dump(purple_ranges, data_file)
-        pink_ranges = tuple(str(index) for index in self.text_area.tag_ranges("pink"))
-        pickle.dump(pink_ranges, data_file)
-        # Close file
-        data_file.close()
+        try:
+            # Open file for binary writing
+            data_file = open(file_name, 'wb')
+            # Get note content
+            typed_note_content = self.text_area.get("1.0", tk.END)
+            # Add typed note content to pickle file
+            pickle.dump(typed_note_content, data_file)
+            # Get index of every underlined sequence and put into a tuple
+            underline_ranges = tuple(str(index) for index in self.text_area.tag_ranges("underline"))
+            # Add underlined sequences to pickle file
+            pickle.dump(underline_ranges, data_file)
+            # Repeat the process for other colors
+            red_ranges = tuple(str(index) for index in self.text_area.tag_ranges("red"))
+            pickle.dump(red_ranges, data_file)
+            blue_ranges = tuple(str(index) for index in self.text_area.tag_ranges("blue"))
+            pickle.dump(blue_ranges, data_file)
+            green_ranges = tuple(str(index) for index in self.text_area.tag_ranges("green"))
+            pickle.dump(green_ranges, data_file)
+            yellow_ranges = tuple(str(index) for index in self.text_area.tag_ranges("yellow"))
+            pickle.dump(yellow_ranges, data_file)
+            purple_ranges = tuple(str(index) for index in self.text_area.tag_ranges("purple"))
+            pickle.dump(purple_ranges, data_file)
+            pink_ranges = tuple(str(index) for index in self.text_area.tag_ranges("pink"))
+            pickle.dump(pink_ranges, data_file)
+            # Close file
+            data_file.close()
+        except:
+            return
     
     # Open Pickle File Function
     # Description: Loads information from a pickle file. It inserts the typed note content into the text area and then adds the underlined/color sequences back to the text area.
