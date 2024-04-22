@@ -13,10 +13,10 @@ import pickle
 import pyaudio
 import os
 import wave
+import pyautogui
 from tkinter import ttk, Listbox, Scrollbar, Menu
 import speech_recognition as sr
 from tkinter import ttk, Menu, font
-from PIL import Image, ImageTk
 
 # Font for landing page title
 LARGEFONT =("Verdana", 25)
@@ -110,7 +110,7 @@ class LandingPage(tk.Frame):
             button.pack(padx=10, pady=5)
 
         # Create a listbox and scrollbar for notes in directory
-        # Bind to and "on_select" function to handle selection of notes
+        # Bind to an "on_select" function to handle selection of notes
         # Source: https://tkdocs.com/tutorial/morewidgets.html
         scrollbar = Scrollbar(self)
         scrollbar.grid(row=0, column=1, rowspan=4, sticky='ns')
@@ -178,6 +178,15 @@ class LandingPage(tk.Frame):
             file_name = os.path.splitext(os.path.basename(file_path))[0]
             # Set the window title to the file name
             controller.title(file_name + " - Note-Taker App")
+            controller.show_frame(DrawnNotePage)
+            menu_bar = self.buildDrawnNoteMenu()
+            # Configure the typed note page to use the menu bar
+            controller.config(menu=menu_bar)
+            # Open the pickle file and update canvas
+            controller.frames[DrawnNotePage].open_pickle_file_drawn(file_path)
+        elif file_path == "":
+            # Show an error message the user did not open anything
+            tk.messagebox.showerror("Error", f"No file selected!")
         else:
             # Show an error message if there's any issue with opening
             tk.messagebox.showerror("Error", f"Not a valid file type: {file_path}")
@@ -250,6 +259,13 @@ class LandingPage(tk.Frame):
             file_name = os.path.splitext(os.path.basename(file_path))[0]
             # Set the window title to the file name
             controller.title(file_name + " - Note-Taker App")
+            # Change frame
+            controller.show_frame(DrawnNotePage)
+            menu_bar = self.buildDrawnNoteMenu()
+            # Configure the typed note page to use the menu bar
+            controller.config(menu=menu_bar)
+            # Open the pickle file and update canvas
+            controller.frames[DrawnNotePage].open_pickle_file_drawn(file_path)
         else:
             # Show an error message if there's any issue with opening
             tk.messagebox.showerror("Error", f"Not a valid file type: {file_path}")
@@ -259,12 +275,15 @@ class LandingPage(tk.Frame):
     # Preconditions: Self and the selection event must be passed as a parameter.
     # Postconditions: The selected note is loaded.
     def on_select(self, event):
-        # Use event.widget to refer to the listbox selection
-        selected_note = event.widget.get(event.widget.curselection())
-        # Get the controller from class
-        controller = self.controller
-        # Load the selected note from the listbox
-        self.note_listbox(controller, selected_note) 
+        try:
+            # Use event.widget to refer to the listbox selection
+            selected_note = event.widget.get(event.widget.curselection())
+            # Get the controller from class
+            controller = self.controller
+            # Load the selected note from the listbox
+            self.note_listbox(controller, selected_note)
+        except:
+            return
             
     # Build Typed Note Menu Function
     # Description:
@@ -327,8 +346,8 @@ class LandingPage(tk.Frame):
 
         # Create file menu
         file_menu = tk.Menu(menu_bar, tearoff=0)
-        file_menu.add_command(label="Open", command=self.controller.frames[DrawnNotePage].load_drawn_note)
-        file_menu.add_command(label="Save", command=self.controller.frames[DrawnNotePage].save_drawn_note)
+        file_menu.add_command(label="Open", command=self.controller.frames[DrawnNotePage].load_drawn_note_driver)
+        file_menu.add_command(label="Save", command=self.controller.frames[DrawnNotePage].save_drawn_note_driver)
         file_menu.add_command(label="Export", command=self.controller.frames[DrawnNotePage].export_drawn_note)
         file_menu.add_separator()
 
@@ -1102,6 +1121,8 @@ class DrawnNotePage(tk.Frame):
         self.canvas.bind("<B1-Motion>", self.add_line)
 
         self.lastx, self.lasty = None, None
+        # A stored tuple of actions
+        self.actions = []
 
     # Save Position Function
     # Description:
@@ -1117,6 +1138,8 @@ class DrawnNotePage(tk.Frame):
     def add_line(self, event):
         if self.lastx and self.lasty:
             self.canvas.create_line((self.lastx, self.lasty, event.x, event.y), fill=self.color)
+            # Save the line to the list of actions
+            self.actions.append(('line', self.lastx, self.lasty, event.x, event.y, self.color))
         self.save_posn(event)
     
     # Set Line Color Function
@@ -1127,20 +1150,25 @@ class DrawnNotePage(tk.Frame):
         self.color = line_color
 
     # Export Drawn Note Function
+    # Refered to this documentation to create screenshots using PYAutoGUI: https://pyautogui.readthedocs.io/en/latest/screenshot.html
     # Description: Allows the user to export the drawn note to a .png file.
     # Preconditions: Self must be passed as a parameter.
     # Postconditions: The drawn note is exported to a .png file.
     def export_drawn_note(self):
-        # Create a file dialog for the user to select the save location
         file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Files", "*.png")])
 
         if file_path:  # If user selected a file path
             try:
-                # Create an image (screenshot) of the canvas and save it as a PNG file
-                self.canvas.postscript(file=file_path, colormode='color')
-
-                tk.messagebox.showinfo("Success", "Typed note exported successfully!")
-
+                # Get the position and size of the canvas
+                x = self.canvas.winfo_rootx()
+                y = self.canvas.winfo_rooty()
+                width = self.canvas.winfo_width()
+                height = self.canvas.winfo_height()
+                # Capture the contents of the canvas
+                img = pyautogui.screenshot(region=(x, y, width, height))
+                # Save the image as a PNG file
+                img.save(file_path)
+                tk.messagebox.showinfo("Success", "Drawn note exported successfully!")
             except Exception as e:
                 tk.messagebox.showerror("Error", f"An error occurred while exporting the drawn note: {e}")
 
@@ -1149,25 +1177,15 @@ class DrawnNotePage(tk.Frame):
     # Preconditions: Self must be passed as a parameter.
     # Postconditions: The file path is returned if a file is selected.
     def save_drawn_note(self):
-        # Open a file dialog for the user to select the save location
-        file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("Drawn Note Files", "*.png")], title="Save as")
-        # If a file path is selected
-        if file_path:
+        file_path = filedialog.asksaveasfilename(defaultextension=".dra", filetypes=[("Drawn Note Files", "*.dra")], title="Save as")
+
+        if file_path:  # If a file path is selected
             try:
-                # Take a screenshot of the canvas and save it as a PNG file
-                self.canvas.postscript(file=file_path, colormode='color')
-
-                # Show a success message
-                messagebox.showinfo("Success", "Drawn note saved successfully!")
-
-                # Get name of file path without the directory path or extension
+                tk.messagebox.showinfo("Success", "Drawn note saved successfully!")
                 file_name = os.path.splitext(os.path.basename(file_path))[0]
-                # Set the window title to the file name
                 self.controller.title(file_name + " - Note-Taker App")
-                
                 return file_path
             except Exception as e:
-                # Show an error message if there's any issue with saving
                 tk.messagebox.showerror("Error", f"An error occurred while saving the drawn note: {e}")
     
     # Load Drawn Note Function
@@ -1176,46 +1194,70 @@ class DrawnNotePage(tk.Frame):
     # Postconditions: The file path is returned if a file is selected.
     def load_drawn_note(self):
         # Open a file dialog for the user to select the load location
-        file_path = filedialog.askopenfilename(defaultextension=".png", filetypes=[("PNG", "*.png")], title="Load File")
+        file_path = filedialog.askopenfilename(defaultextension=".dra", filetypes=[("Drawn Note Files", "*.dra")], title="Load File")
         # If a file path is selected
         if file_path:
             try:
-                # Show a success message
-                messagebox.showinfo("Success", "Drawn note successfully opened!")
-
-                # Open the image using PIL
-                image = Image.open(file_path)
-
-                # Display the image on the canvas
-                self.display_image(image)
-
                 # Get name of file path without the directory path or extension
                 file_name = os.path.splitext(os.path.basename(file_path))[0]
                 # Set the window title to the file name
                 self.controller.title(file_name + " - Note-Taker App")
-
                 return file_path
             except Exception as e:
                 # Show an error message if there's any issue with opening
                 messagebox.showerror("Error", f"An error occurred while opening the drawn note: {e}")
+    
+    # Create Pickle File Function
+    # Description: Creates a pickle file with the drawn note content.
+    # Preconditions: Self and the file name must be passed as parameters.
+    # Postconditions: A pickle file is created with the drawn note content saved.
+    def create_pickle_file_drawn(self, file_name):
+        try:
+            # Open file for binary writing
+            data_file = open(file_name, 'wb')
+            pickle.dump(self.actions, data_file)
+            data_file.close()
+        except:
+            return
+    
+    # Open Pickle File Function
+    # Description: Loads information from a pickle file. It inserts the drawn note content into the canvas.
+    # Preconditions: Self and the file name must be passed as parameters.
+    # Postconditions: The drawn note content is updated to be the content of the pickle file.
+    def open_pickle_file_drawn(self, file_name):
+        try:
+            # Open file for binary writing
+            data_file = open(file_name, 'rb')
+            self.actions = pickle.load(data_file)
+            data_file.close()
+            self.canvas.delete("all")  # Clear the canvas before redrawing
+            for action in self.actions:
+                if action[0] == 'line':
+                    self.canvas.create_line(action[1:5], fill=action[5])
+            tk.messagebox.showinfo("Success", "Drawn note opened successfully!")
+        except: 
+            return
+      
+    # Save Drawn Note Driver Function
+    # Description: This function is the driver for saving a drawn note.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The drawn note is saved.
+    def save_drawn_note_driver(self):
+        # Launch window for user to save a drawn note
+        # Set "saved_file" to file location
+        saved_file = self.save_drawn_note()
+        # Create a pickle file and save it to file location
+        self.create_pickle_file_drawn(saved_file)
 
-    # Display Image Function
-    # Description:
-    # Preconditions:
-    # Postconditions: 
-    def display_image(self, image):
-        # Convert the PIL image to a format that Tkinter can handle directly
-        photo = ImageTk.PhotoImage(image)
-        # Create or update the canvas to display the image
-        if self.canvas is None:
-            self.canvas = tk.Canvas(self, width=image.width, height=image.height)
-            self.canvas.pack()  # Adjust the placement as needed
-        else:
-            self.canvas.delete("all")
-        # Display the image on the canvas
-        self.canvas.create_image(0, 0, anchor=tk.NW, image=photo)
-        # Save a reference to the PhotoImage to prevent garbage collection
-        self.canvas.image = photo
+    # Load Drawn Note Driver Function
+    # Description: This function is the driver for loading a drawn note.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The note is loaded.
+    def load_drawn_note_driver(self):
+        # Launch window for user to load a drawn note
+        opened_file = self.load_drawn_note()
+        # Open a pickle file and load it
+        self.open_pickle_file_drawn(opened_file)
 
 # Driver Code
 app = noteTaker()
