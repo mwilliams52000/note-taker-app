@@ -384,6 +384,7 @@ class LandingPage(tk.Frame):
         color_menu.add_command(label="Yellow", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("yellow"))
         color_menu.add_command(label="Purple", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("purple"))
         color_menu.add_command(label="Pink", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("pink"))
+        color_menu.add_command(label="Eraser", command=lambda: self.controller.frames[DrawnNotePage].set_line_color("white"))
 
         menu_bar.add_cascade(label="Color", menu=color_menu)
 
@@ -435,6 +436,7 @@ class TypedNotePage(tk.Frame):
     def key_release_return_control(self):
         self.is_prev_line_bulleted()
         self.identify_misspelled_words()
+        self.is_prev_char_font()
     
     # Button 1 Control Function
     # Description: Manages the text area strings and identifies misspelled words by calling related functions.
@@ -453,6 +455,7 @@ class TypedNotePage(tk.Frame):
         self.identify_misspelled_words()
         self.is_prev_char_underlined()
         self.is_prev_char_colored()
+        self.is_prev_char_font()
     
     # Key Control Function
     # Description: Checks if the previous character is underlined or colored by calling related functions.
@@ -461,13 +464,41 @@ class TypedNotePage(tk.Frame):
     def key_control(self):
         self.is_prev_char_underlined()
         self.is_prev_char_colored()
+        self.is_prev_char_font()
 
     # Change Font Function
     # Description: Changes the font of the TypedNotePage.
     # Preconditions: Self and the font must be passed as parameters.
     # Postconditions: The font of the TypedNotePage is changed.
     def change_font(self, font):
-        self.text_area.config(font=(font, 12))
+        # Get the current selection
+        current_selection = self.text_area.tag_ranges(tk.SEL)
+        # If there is a selection, change the font
+        if current_selection:
+            self.text_area.tag_add(font, current_selection[0], current_selection[1])
+            self.text_area.tag_configure(font, font=(font, 12))
+        else:
+            # No selection, so change the font of the whole text area
+            self.text_area.configure(font=(font, 12))
+
+    # Is Previous Character Font Function
+    # Description: Checks if the previous character is a font. If it is, change the current character to that font.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The current character is changed to the font of the previous character.
+    def is_prev_char_font(self):
+        # Get the current index of the typing cursor
+        current_index = self.text_area.index(tk.INSERT)
+        # Get the index of the previous character
+        prev_char_index = "{}.{}".format(current_index.split('.')[0], int(current_index.split('.')[1]) - 1)
+        # Get the tags of the previous character
+        prev_char_tags = self.text_area.tag_names(prev_char_index)
+        # Check if the previous character has any tags
+        if prev_char_tags:
+            # If it does, get the font of the first tag
+            prev_char_font = self.text_area.tag_cget(prev_char_tags[0], "font")
+            # Apply the same font to the current character
+            self.text_area.tag_add(prev_char_tags[0], current_index)
+            self.text_area.tag_configure(prev_char_tags[0], font=prev_char_font)
 
     # Underline Text Function
     # Description: Underlines the selected text in the text area.
@@ -951,6 +982,20 @@ class TypedNotePage(tk.Frame):
             pickle.dump(purple_ranges, data_file)
             pink_ranges = tuple(str(index) for index in self.text_area.tag_ranges("pink"))
             pickle.dump(pink_ranges, data_file)
+            # Create a dictionary to store font settings for each text range
+            font_settings = {}
+            # Increment through text area tags
+            for tag_name in self.text_area.tag_names():
+                # For each index in range
+                for index in self.text_area.tag_ranges(tag_name):
+                    # Get font
+                    font = self.text_area.tag_cget(tag_name, "font")
+                    # If font is set, add to dictionary with index as key
+                    if font:  
+                        font_settings[str(index)] = font
+            # Add font settings to pickle file
+            pickle.dump(font_settings, data_file)
+
             # Close file
             data_file.close()
         except:
@@ -975,12 +1020,16 @@ class TypedNotePage(tk.Frame):
             yellow_ranges = pickle.load(data_file)
             purple_ranges = pickle.load(data_file)
             pink_ranges = pickle.load(data_file)
+            # Load font settings
+            font_settings = pickle.load(data_file)
             # Close file
             data_file.close()
             # Wipe text area clean
             self.text_area.delete("1.0", tk.END)
             # Insert typed note content into text area
             self.text_area.insert(tk.END, typed_note_content)
+            # Prevent user from undoing the insertion of the typed note content
+            self.text_area.edit_reset()
             # Add underlined sequences back to text area
             i = 0
             # Add underlined sequences back to text area
@@ -1037,6 +1086,24 @@ class TypedNotePage(tk.Frame):
                 # in pairs of two, then increment i counter by 2
                 self.text_area.tag_add("pink", pink_ranges[i], pink_ranges[i+1])
                 self.text_area.tag_configure("pink", foreground = "pink")
+                i += 2
+            # Convert font settings dictionary to tuple
+            font_settings_tuple = tuple(font_settings.items())
+            # Add font settings back to text area
+            i = 0
+            while(i < len(font_settings_tuple)):
+                # As the tuple consists of start and end pairs, add the tag to the text area
+                # in pairs of two, then increment i counter by 2
+                # Get index and font from first tuple item
+                font_setting = font_settings_tuple[i]
+                font = font_setting[1]
+                index_lower = font_setting[0]
+                # Get index from second tuple item
+                font_setting = font_settings_tuple[i + 1]
+                index_upper = font_setting[0]
+                # Add font settings to text area using font and lower/upper index
+                self.text_area.tag_add("font", index_lower, index_upper)
+                self.text_area.tag_configure("font", font=font)
                 i += 2
         except:
             return
@@ -1242,6 +1309,7 @@ class DrawnNotePage(tk.Frame):
         try:
             # Open file for binary writing
             data_file = open(file_name, 'wb')
+            # Add actions to pickle file
             pickle.dump(self.actions, data_file)
             data_file.close()
         except:
@@ -1255,11 +1323,17 @@ class DrawnNotePage(tk.Frame):
         try:
             # Open file for binary writing
             data_file = open(file_name, 'rb')
+            # Wipe any existing actions
+            self.actions = []
+            # Load actions
             self.actions = pickle.load(data_file)
             data_file.close()
             self.canvas.delete("all")  # Clear the canvas before redrawing
+            # Replicate actions that were loaded from the pickle file into the current canvas
             for action in self.actions:
+                # Make sure the first element is "line"
                 if action[0] == 'line':
+                    # Elements 1 through 5 of action are the x and y coordinates of the line and the color
                     self.canvas.create_line(action[1:5], fill=action[5])
             tk.messagebox.showinfo("Success", "Drawn note opened successfully!")
         except: 
