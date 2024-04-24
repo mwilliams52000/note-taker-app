@@ -17,6 +17,7 @@ import pyautogui
 from tkinter import ttk, Listbox, Scrollbar, Menu
 import speech_recognition as sr
 from tkinter import ttk, Menu, font
+import tkinter.font as tkFont
 
 # Font for landing page title
 LARGEFONT =("Verdana", 25)
@@ -329,6 +330,25 @@ class LandingPage(tk.Frame):
         color_menu.add_command(label="Pink", command=lambda: self.controller.frames[TypedNotePage].change_color("pink"))
         menu_bar.add_cascade(label="Color", menu=color_menu)
 
+        # Create font menu
+        font_menu = tk.Menu(menu_bar, tearoff=0)
+
+        # Create a submenu with font options
+        font_submenu = tk.Menu(font_menu, tearoff=0)
+        
+        # Get all available fonts
+        available_fonts = list(tkFont.families())
+
+        # Add each font as an option in the submenu
+        for font in available_fonts:
+            font_submenu.add_command(label=font, command=lambda f=font: self.controller.frames[TypedNotePage].change_font(f))
+
+        # Add the submenu to the font menu
+        font_menu.add_cascade(label="Change Font", menu=font_submenu)
+
+        # Add the font menu to the menu bar
+        menu_bar.add_cascade(label="Font", menu=font_menu)
+
         # Create transcribe speech menu
         transcribe_menu = tk.Menu(menu_bar, tearoff=0)
         transcribe_menu.add_command(label="Start Transcription", command=self.controller.frames[TypedNotePage].create_audio_window)
@@ -441,6 +461,13 @@ class TypedNotePage(tk.Frame):
     def key_control(self):
         self.is_prev_char_underlined()
         self.is_prev_char_colored()
+
+    # Change Font Function
+    # Description: Changes the font of the TypedNotePage.
+    # Preconditions: Self and the font must be passed as parameters.
+    # Postconditions: The font of the TypedNotePage is changed.
+    def change_font(self, font):
+        self.text_area.config(font=(font, 12))
 
     # Underline Text Function
     # Description: Underlines the selected text in the text area.
