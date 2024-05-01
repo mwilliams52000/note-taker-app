@@ -398,6 +398,7 @@ class TypedNotePage(tk.Frame):
     # Description: Initializes the TypedNotePage class
     # Preconditions: The frame must be passed.
     # Postconditions: The TypedNotePage frame is initialized.
+    # Note: This article was referenced to build the text widget and use some common methods throughout functions in the class (https://www.geeksforgeeks.org/python-tkinter-text-widget/).
     def __init__(self, parent, controller):
         # The top menu is built within a separate function called in the control method for this frame
         # See new_typed_note_navigate(), load_note_navigate(), and buildTypedNoteMenu() for more information
@@ -587,7 +588,7 @@ class TypedNotePage(tk.Frame):
     def remove_underline_text(self):
         # Get the current selection
         current_selection = self.text_area.tag_ranges(tk.SEL)
-        # If there is a selection, underline the text
+        # If there is a selection, remove the underline text tag
         if current_selection:
             self.text_area.tag_remove("underline", current_selection[0], current_selection[1])
             self.text_area.tag_configure("", underline=False)
@@ -597,9 +598,13 @@ class TypedNotePage(tk.Frame):
     # Preconditions: Self must be passed as a parameter.
     # Postconditions: A bullet point is added at the start of the current line.
     def add_bullet_point(self):
-        # Get the current index of the typing cursor within the text_area
+        # Get the current index of the typing cursor within the text_area 
         current_index = self.text_area.index(tk.INSERT)
-        # Get the start index of the current line of the text_area
+        # Use custom string formatting to get the start of the line index by splitting the current index using
+        # the '.' character as a delimiter and getting the first element of the resulting list.
+        # Then, concatenate the ".0" string to the end of the first element to get the start of the line.
+        # I.e. If the current index is 5.7, then the start of the line is 5.0
+        # Source on custom string formatting: https://docs.python.org/3/library/string.html
         line_start_index = "{}.0".format(current_index.split('.')[0])
         # Insert bullet point at the start of the line
         # \u2022 is the unicode escape for a bullet point character
@@ -613,7 +618,11 @@ class TypedNotePage(tk.Frame):
     def is_prev_line_bulleted(self):
         # Get the current index of the typing cursor
         current_index = self.text_area.index(tk.INSERT)
-        # Get the start index of the current line
+        # Use custom string formatting to get the start of the line index by splitting the current index using
+        # the '.' character as a delimiter and getting the first element of the resulting list.
+        # Then, concatenate the ".0" string to the end of the first element to get the start of the line.
+        # I.e. If the current index is 5.7, then the start of the line is 5.0
+        # Source on custom string formatting: https://docs.python.org/3/library/string.html
         line_start_index = "{}.0".format(current_index.split('.')[0])
         # If the line start index is not 1.0, then this current line is not the first line
         if not(line_start_index == "1.0"):
@@ -632,6 +641,8 @@ class TypedNotePage(tk.Frame):
         # Get the current index of the typing cursor
         current_index = self.text_area.index(tk.INSERT)
         # Get the index of the previous character
+        # Subtract 1 from the decimal value of the current index to get the previous character index
+        # I.e. 5.7 would become 5.6
         prev_char_index = "{}.{}".format(current_index.split('.')[0], int(current_index.split('.')[1]) - 1)
 
         # Check if the previous character has the "underline" tag
@@ -648,6 +659,8 @@ class TypedNotePage(tk.Frame):
         # Get the current index of the typing cursor
         current_index = self.text_area.index(tk.INSERT)
         # Get the index of the previous character
+        # Subtract 1 from the decimal value of the current index to get the previous character index
+        # I.e. 5.7 would become 5.6
         prev_char_index = "{}.{}".format(current_index.split('.')[0], int(current_index.split('.')[1]) - 1)
 
         # Check if the previous character has the color tag
@@ -686,7 +699,7 @@ class TypedNotePage(tk.Frame):
     # Postconditions: The class's list of words is updated.
     def manage_text_area_strings(self):
         currentWordsList = []
-        # Get all characters in the text area as one long string
+        # Get all characters in the text area as one long string except for the very last character
         allText = self.text_area.get("1.0", "end-1c")
         # Remove punctuation from the text
         cleanedText = ''
@@ -799,7 +812,7 @@ class TypedNotePage(tk.Frame):
             # Create a new window for audio recording
             self.audio_window = tk.Toplevel(self)
             self.audio_window.title("Audio Recorder")
-            self.audio_window.geometry("300x200")
+            self.audio_window.geometry("400x200")
 
             # Bind the close event to the toggle_recording function
             # Source: https://tkdocs.com/tutorial/windows.html
@@ -825,6 +838,9 @@ class TypedNotePage(tk.Frame):
 
             # Increment count of windows
             self.windowNum = self.windowNum + 1
+
+            # Set minimum size of window
+            self.audio_window.minsize(300, 200)
 
     # Toggle Recording Function
     # This function was partially adapted from this source: https://www.youtube.com/watch?v=u_xNvC9PpHA& 
@@ -940,9 +956,8 @@ class TypedNotePage(tk.Frame):
                 # Convert raw data to AudioData
                 audio_data = sr.AudioData(audio_file.readframes(audio_file.getnframes()), audio_file.getframerate(), audio_file.getsampwidth())
                 return audio_data
-        except FileNotFoundError:
-            # Debug message
-            print("Error: Audio file not found")  
+        except FileNotFoundError as e:
+            tk.messagebox.showerror("Error", f"An error occurred while transcribing: {e}")
             return False
     
     # Delete Audio File Function
@@ -952,9 +967,8 @@ class TypedNotePage(tk.Frame):
     def delete_audio_file(self):
         try:
             os.remove("Audio.wav")
-        except FileNotFoundError:
-            # Debug message
-            print("Error: Audio file not found")
+        except FileNotFoundError as e:
+            tk.messagebox.showerror("Error", f"An error occurred while transcribing: {e}")
     
     # Export Typed Note Function
     # Source: https://tkdocs.com/shipman/tkFileDialog.html
@@ -1310,6 +1324,7 @@ class DrawnNotePage(tk.Frame):
     # Description: Initializes the DrawnNotePage class
     # Preconditions: The frame is required to be passed as a parameter
     # Postconditions: The DrawnNotePage class is initialized
+    # Note: This article was referenced to create the canvas and construct some of the functions (https://tkdocs.com/tutorial/canvas.html).
     def __init__(self, parent, controller):
         # The top menu is built within a separate function called in the control method for this frame
         # See new_drawn_note_navigate(), load_note_navigate(), and buildDrawnNoteMenu() for more information
@@ -1340,6 +1355,7 @@ class DrawnNotePage(tk.Frame):
         self.actions = []
 
     # Save Position Function
+    # Source: https://tkdocs.com/tutorial/canvas.html
     # Description: Saves the position of the mouse
     # Preconditions: The event must be passed as a parameter
     # Postconditions: The position of the mouse is saved
@@ -1347,6 +1363,7 @@ class DrawnNotePage(tk.Frame):
         self.lastx, self.lasty = event.x, event.y
 
     # Add Line Function
+    # Source: https://tkdocs.com/tutorial/canvas.html
     # Description: Adds a line to the canvas
     # Preconditions: The event must be passed as a parameter
     # Postconditions: A line is added to the canvas.
