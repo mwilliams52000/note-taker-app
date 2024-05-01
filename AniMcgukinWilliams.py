@@ -925,7 +925,7 @@ class TypedNotePage(tk.Frame):
             # If the text was successfully transcribed, insert it into the text area and delete the audio temp file
             if (not(text == False)):
                 self.text_area.insert(tk.END, text)
-                self.delete_audio_file()
+            self.delete_audio_file()
     
     # Transcribe Speech Function
     # Adapted from source: https://github.com/Uberi/speech_recognition/blob/master/examples/microphone_recognition.py
