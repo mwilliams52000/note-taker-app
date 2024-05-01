@@ -38,3 +38,11 @@ To install pyaudio, type this into the command line:
 To install pyspellchecker, type this into the command line:
 
     py -m pip install pyspellchecker
+
+To install the speech recognition library, type this into the command line:
+
+    py -m pip install SpeechRecognition
+
+To install pyautogui, type this into the command line:
+
+    py -m pip install pyautogui
