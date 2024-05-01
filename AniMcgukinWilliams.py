@@ -72,7 +72,7 @@ class LandingPage(tk.Frame):
         self.controller = controller
         self.grid(sticky=tk.N+tk.S+tk.E+tk.W)
 
-        # Get a list of all the notes in the current directory
+        # Get a list of all the notes in the "notes" directory
         notes_list = self.get_drawn_and_typed_notes_list()
 
         # Set size of window
@@ -208,7 +208,7 @@ class LandingPage(tk.Frame):
         return file_path
 
     # Get Drawn and Typed Notes List Function
-    # Description: Returns a list of the drawn and typed notes within the local directory and notes folder.
+    # Description: Returns a list of the drawn and typed notes within the local directory notes folder.
     # Preconditions: Self must be passed as a parameter.
     # Postconditions: The list of notes is returned.
     def get_drawn_and_typed_notes_list(self):
@@ -236,8 +236,8 @@ class LandingPage(tk.Frame):
         return notes_list
 
     # Note Listbox Function
-    # Description: Gets the selection an entry in listbox and opens it.
-    # Preconditions: Self , controller, and file_path must be passed as a parameter.
+    # Description: Gets the selection of an entry from listbox and opens it.
+    # Preconditions: Self, controller, and file_path must be passed as a parameter.
     # Postconditions: The selected note is opened and loaded.
     def note_listbox(self, controller, file_path):
         # Determine if file extension is .typ, .dra, or something else
@@ -287,9 +287,9 @@ class LandingPage(tk.Frame):
             return
             
     # Build Typed Note Menu Function
-    # Description:
-    # Preconditions:
-    # Postconditions:
+    # Description: Builds the top menu for the TypedNotePage.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The menu is built.
     def buildTypedNoteMenu(self):
         # Create a menu bar
         menu_bar = tk.Menu(self)
@@ -359,9 +359,9 @@ class LandingPage(tk.Frame):
         return menu_bar
     
     # Build Drawn Note Menu Function
-    # Description:
-    # Preconditions:
-    # Postconditions:
+    # Description: Builds the top menu for the DrawnNotePage.
+    # Preconditions: Self must be passed as a parameter.
+    # Postconditions: The menu is built.
     def buildDrawnNoteMenu(self):
         # Create a menu bar
         menu_bar = tk.Menu(self)
@@ -399,6 +399,9 @@ class TypedNotePage(tk.Frame):
     # Preconditions: The frame must be passed.
     # Postconditions: The TypedNotePage frame is initialized.
     def __init__(self, parent, controller):
+        # The top menu is built within a separate function called in the control method for this frame
+        # See new_typed_note_navigate(), load_note_navigate(), and buildTypedNoteMenu() for more information
+
         tk.Frame.__init__(self, parent)
         self.windowNum = 0
         self.controller = controller
@@ -444,9 +447,9 @@ class TypedNotePage(tk.Frame):
         self.controller.protocol("WM_DELETE_WINDOW", self.exit_window_driver)
 
     # Key Release Return Control Function
-    # Description: Checks if the previous line is bulleted and identifies misspelled words by calling related functions.
+    # Description: Checks if the previous line is bulleted or contains a font and identifies misspelled words by calling related functions.
     # Preconditions: Self must be passed as a parameter.
-    # Postconditions: The current line is bulleted if needed and misspelled words are identified.
+    # Postconditions: The current line is bulleted or fonted if needed and misspelled words are identified.
     def key_release_return_control(self):
         self.is_prev_line_bulleted()
         self.identify_misspelled_words()
@@ -465,10 +468,10 @@ class TypedNotePage(tk.Frame):
         self.is_active = True
     
     # Space Control Function
-    # Description: Identifies misspelled words and checks if the previous character is underlined or colored 
+    # Description: Identifies misspelled words and checks if the previous character is underlined, colored, or fonted
     # by calling related functions.
     # Preconditions: Self must be passed as a parameter.
-    # Postconditions: Misspelled words are identified and the current character is underlined or colored if needed.
+    # Postconditions: Misspelled words are identified and the current character is underlined, colored, or fonted if needed.
     def space_control(self):
         self.identify_misspelled_words()
         self.is_prev_char_underlined()
@@ -478,9 +481,9 @@ class TypedNotePage(tk.Frame):
         self.is_active = True
     
     # Key Control Function
-    # Description: Checks if the previous character is underlined or colored by calling related functions.
+    # Description: Checks if the previous character is underlined, colored, or fonted by calling related functions.
     # Preconditions: Self must be passed as a parameter.
-    # Postconditions: The current character is underlined or colored if needed.
+    # Postconditions: The current character is underlined, colored, or fonted if needed.
     def key_control(self):
         self.is_prev_char_underlined()
         self.is_prev_char_colored()
@@ -563,7 +566,7 @@ class TypedNotePage(tk.Frame):
         # Get the current selection
         current_selection = self.text_area.tag_ranges(tk.SEL)
     
-        # List of supported colors
+        # List of our supported colors
         colors = ["red", "blue", "green", "yellow", "purple", "pink", "black"]
     
         # For every color in the list of colors, remove the tag if it is present
@@ -579,7 +582,7 @@ class TypedNotePage(tk.Frame):
 
     # Remove Underline Text Function
     # Description: Removes the underline from the selected text in the text area.
-    # Preconditions:
+    # Preconditions: Self must be passed as a parameter.
     # Postconditions: The underline is removed from the selected text.
     def remove_underline_text(self):
         # Get the current selection
@@ -787,7 +790,7 @@ class TypedNotePage(tk.Frame):
             self.controller.destroy()
 
     # Create Audio Window Function
-    # Description: Creates a new window for audio recording.
+    # Description: Creates a new window for audio recording. This function is called when the user selects the "Start Transcription" menu option.
     # Preconditions: Self must be passed as a parameter.
     # Postconditions: A new window for audio recording is built and launched.
     def create_audio_window(self):
@@ -861,7 +864,7 @@ class TypedNotePage(tk.Frame):
     # This function was partially adapted from this source: https://www.youtube.com/watch?v=u_xNvC9PpHA& 
     # Description: Takes audio while the thread is running.
     # Preconditions: Self must be passed as a parameter.
-    # Postconditions: None
+    # Postconditions: Speech is transcribed and inserted into the text area if it can be transcribed.
     def take_audio(self):
         # Takes audio while the thread is running
         audio = pyaudio.PyAudio()
@@ -909,7 +912,7 @@ class TypedNotePage(tk.Frame):
                 self.delete_audio_file()
     
     # Transcribe Speech Function
-    # Source: https://github.com/Uberi/speech_recognition/blob/master/examples/microphone_recognition.py
+    # Adapted from source: https://github.com/Uberi/speech_recognition/blob/master/examples/microphone_recognition.py
     # Description: Transcribes the speech from the audio file.
     # Preconditions: Self and the audio must be passed as parameters.
     # Postconditions: The speech is transcribed and returned if it can be transcribed. Else, False is returned.
@@ -918,22 +921,19 @@ class TypedNotePage(tk.Frame):
         # recognize speech using Google Speech Recognition
         try:
             message = r.recognize_google(audio, language="english")
-            # Debug message
-            print("Google thinks you said '" + message + "'.")
             return message
-        except sr.UnknownValueError:
-            # Debug message
-            print("Google could not understand audio")
+        except sr.UnknownValueError as e:
+            tk.messagebox.showerror("Error", f"An error occurred while transcribing: {e}")
             return False
         except sr.RequestError as e:
-            # Debug message
-            print(f"Could not request results from Google; {e}")
+            tk.messagebox.showerror("Error", f"An error occurred while transcribing: {e}")
             return False
     
     # Open Audio File Function
+    # Source: https://docs.python.org/3/library/wave.html
     # Description: Opens the audio file.
     # Preconditions: Self must be passed as a parameter.
-    # Postconditions: The audio file is opened and returned if it can be opened. Else, False is returned.
+    # Postconditions: The audio file is opened and audio data is returned if it can be opened. Else, False is returned.
     def open_audio_file(self):  
         try:
             with wave.open("Audio.wav", "rb") as audio_file:
@@ -981,6 +981,7 @@ class TypedNotePage(tk.Frame):
                 tk.messagebox.showerror("Error", f"An error occurred while exporting the typed note: {e}")
     
     # Save Typed Note Function
+    # Source: https://tkdocs.com/shipman/tkFileDialog.html
     # Description: Opens a file dialog for the user to select the save location. They can select a .typ file to save.
     # Preconditions: Self must be passed as a parameter.
     # Postconditions: The file path is returned if a file is selected.
@@ -1006,6 +1007,7 @@ class TypedNotePage(tk.Frame):
                 tk.messagebox.showerror("Error", f"An error occurred while saving the typed note: {e}")
     
     # Load Typed Note Function
+    # Source: https://tkdocs.com/shipman/tkFileDialog.html
     # Description: Opens a file dialog for the user to select the load location. They can select a .typ file to load.
     # Preconditions: Self must be passed as a parameter.
     # Postconditions: The file path is returned if a file is selected.
@@ -1309,6 +1311,9 @@ class DrawnNotePage(tk.Frame):
     # Preconditions: The frame is required to be passed as a parameter
     # Postconditions: The DrawnNotePage class is initialized
     def __init__(self, parent, controller):
+        # The top menu is built within a separate function called in the control method for this frame
+        # See new_drawn_note_navigate(), load_note_navigate(), and buildDrawnNoteMenu() for more information
+
         tk.Frame.__init__(self, parent)
         self.controller = controller
 
@@ -1350,6 +1355,7 @@ class DrawnNotePage(tk.Frame):
         if self.lastx and self.lasty:
             self.canvas.create_line((self.lastx, self.lasty, event.x, event.y), fill=self.color)
             # Save the line to the list of actions
+            # This is so the action history can be saved and loaded into the pickle file
             self.actions.append(('line', self.lastx, self.lasty, event.x, event.y, self.color))
         self.save_posn(event)
     
@@ -1384,6 +1390,7 @@ class DrawnNotePage(tk.Frame):
                 tk.messagebox.showerror("Error", f"An error occurred while exporting the drawn note: {e}")
 
     # Save Drawn Note Function
+    # Source: https://tkdocs.com/shipman/tkFileDialog.html
     # Description: Opens a file dialog for the user to select the save location. They can select a .dra file to save.
     # Preconditions: Self must be passed as a parameter.
     # Postconditions: The file path is returned if a file is selected.
@@ -1400,6 +1407,7 @@ class DrawnNotePage(tk.Frame):
                 tk.messagebox.showerror("Error", f"An error occurred while saving the drawn note: {e}")
     
     # Load Drawn Note Function
+    # Source: https://tkdocs.com/shipman/tkFileDialog.html
     # Description: Opens a file dialog for the user to select the load location. They can select a .dra file to load.
     # Preconditions: Self must be passed as a parameter.
     # Postconditions: The file path is returned if a file is selected.
@@ -1453,7 +1461,7 @@ class DrawnNotePage(tk.Frame):
             for action in self.actions:
                 # Make sure the first element is "line" to identify that this is in fact an action
                 if action[0] == 'line':
-                    # Elements 1 through 5 of action are the x and y coordinates of the line and the color
+                    # Elements 1 through 4 of action are the start and end x and y coordinates of the line and element 5 is the color
                     self.canvas.create_line(action[1:5], fill=action[5])
             tk.messagebox.showinfo("Success", "Drawn note opened successfully!")
             self.saved = True
